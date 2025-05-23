@@ -1,0 +1,36 @@
+{
+  "Language": "Language",
+  "Dark_Mode": "Dark Mode",
+  "Mute Notifications": "Mute Notifications",
+  "Custom Notifications": "Custom Notifications",
+  "Joined Groups": "Joined Groups",
+  "Invite Friends": "Invite Friends",
+  "Hide Chat History": "Hide Chat History",
+  "Security": "Security",
+  "Terms of App": "Terms of App",
+  "About App": "About App",
+  "Help Center": "Help Center",
+  "Log Out": "Log Out",
+   "loginToChatApp": "Login to ChatApp",
+  "username": "Username",
+  "password": "Password",
+  "login": "Login",
+  "connectWithFriends": "Connect with friends instantly and securely.",
+  "joinMillionsUsers": "Join millions of users chatting worldwide.",
+  "dontHaveAccountRegister": "Don't have an account? Register here",
+  "register": {
+    "createAccount": "Create Your Account",
+    "username": "Username",
+    "password": "Password",
+    "phoneNumber": "Phone Number",
+    "register": "Register",
+    "info1": "Enjoy chatting with your friends anytime, anywhere.",
+    "info2": "Secure and fast communication across the globe.",
+    "loginHere": "Already have an account? Login here"
+  },
+  "errors": {
+    "usernameRequired": "Username is required",
+    "passwordRequired": "Password is required",
+    "phoneRequired": "Phone number is required"
+  }
+}

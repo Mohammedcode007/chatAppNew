@@ -1,0 +1,36 @@
+{
+  "Language": "اللغة",
+  "Dark_Mode": "الوضع الليلي",
+  "Mute Notifications": "كتم الإشعارات",
+  "Custom Notifications": "إشعارات مخصصة",
+  "Joined Groups": "المجموعات المنضم إليها",
+  "Invite Friends": "دعوة الأصدقاء",
+  "Hide Chat History": "إخفاء سجل الدردشة",
+  "Security": "الأمان",
+  "Terms of App": "شروط التطبيق",
+  "About App": "حول التطبيق",
+  "Help Center": "مركز المساعدة",
+  "Log Out": "تسجيل الخروج",
+   "loginToChatApp": "تسجيل الدخول إلى تطبيق الدردشة",
+  "username": "اسم المستخدم",
+  "password": "كلمة المرور",
+  "login": "تسجيل الدخول",
+  "connectWithFriends": "تواصل مع أصدقائك فوراً وبشكل آمن.",
+  "joinMillionsUsers": "انضم إلى ملايين المستخدمين الذين يتحدثون حول العالم.",
+  "dontHaveAccountRegister": "لا تملك حسابًا؟ سجّل هنا",
+   "register": {
+    "createAccount": "أنشئ حسابك",
+    "username": "اسم المستخدم",
+    "password": "كلمة المرور",
+    "phoneNumber": "رقم الهاتف",
+    "register": "تسجيل",
+    "info1": "استمتع بالدردشة مع أصدقائك في أي وقت ومن أي مكان.",
+    "info2": "تواصل آمن وسريع في جميع أنحاء العالم.",
+    "loginHere": "هل لديك حساب؟ قم بتسجيل الدخول هنا"
+  },
+  "errors": {
+    "usernameRequired": "اسم المستخدم مطلوب",
+    "passwordRequired": "كلمة المرور مطلوبة",
+    "phoneRequired": "رقم الهاتف مطلوب"
+  }
+}

@@ -85,7 +85,16 @@ export default function Screen3() {
           color="#fff"
           style={{ marginTop: 30 }}
         />
-
+        <CustomButton
+          title="تسجيل الدخول"
+          onPress={() => router.push('/auth/LoginScreen')}
+          width={SCREEN_WIDTH * 0.8}
+          borderWidth={1}
+          borderColor="#007AFF"
+          backgroundColor="#fff"
+          color="#007AFF"
+          style={{ marginTop: 20 }}
+        />
         <View style={styles.header}>
           <TouchableOpacity onPress={skipOnboarding}>
             <Text style={styles.skipText}>تخطي</Text>

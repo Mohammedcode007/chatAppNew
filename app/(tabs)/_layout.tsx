@@ -1,12 +1,16 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Link, Tabs } from 'expo-router';
 import { Pressable } from 'react-native';
-
+import AntDesign from '@expo/vector-icons/AntDesign';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import Entypo from '@expo/vector-icons/Entypo';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
-
+import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useThemeMode } from '@/context/ThemeContext';
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>['name'];
@@ -16,29 +20,40 @@ function TabBarIcon(props: {
 }
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const { darkMode } = useThemeMode(); // قراءة الوضع من الكونتكست
+  const scheme = (darkMode ? 'dark' : 'light') as 'light' | 'dark';
 
   return (
     <Tabs
+      key={scheme}
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
+        tabBarActiveTintColor: Colors[scheme].tint,
         headerShown: useClientOnlyValue(false, true),
-      }}>
+        headerStyle: {
+          backgroundColor: Colors[scheme].background,
+        },
+        headerTintColor: Colors[scheme].text,
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          title: 'Chats',
+          tabBarIcon: ({ color }) => <Ionicons name="chatbubble-ellipses-outline" size={25}
+            color={color}
+          />,
           headerRight: () => (
             <Link href="/modal" asChild>
               <Pressable>
                 {({ pressed }) => (
+
                   <FontAwesome
                     name="info-circle"
                     size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
+                    color={Colors[scheme].text}
                     style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
                   />
                 )}
@@ -48,10 +63,31 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="two"
+        name="Greoups"
         options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          title: 'Greoups',
+          tabBarIcon: ({ color }) =>
+            <FontAwesome6 name="people-group" size={25} color={color} />
+          ,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color }) => (
+            <AntDesign name="profile" size={25} color={color} />
+          ),
+
+        }}
+      />
+      <Tabs.Screen
+        name="More"
+        options={{
+          title: 'More',
+          tabBarIcon: ({ color }) => (
+            <Entypo name="menu" size={25} color={color} />
+          ),
         }}
       />
     </Tabs>

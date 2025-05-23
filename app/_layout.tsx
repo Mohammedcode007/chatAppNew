@@ -1,68 +1,211 @@
+// import FontAwesome from '@expo/vector-icons/FontAwesome';
+// import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+// import { useFonts } from 'expo-font';
+// import { Stack } from 'expo-router';
+// import * as SplashScreen from 'expo-splash-screen';
+// import { useEffect, useState } from 'react';
+// import 'react-native-reanimated';
+
+// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import { ActivityIndicator, View, I18nManager } from 'react-native';
+// import { I18nextProvider } from 'react-i18next';
+
+// import i18n from '../i18n';
+
+// // ⛔️ منع شاشة البداية من الاختفاء التلقائي
+// SplashScreen.preventAutoHideAsync();
+
+// export default function RootLayout() {
+//   const [fontsLoaded] = useFonts({
+//     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+//     ...FontAwesome.font,
+//   });
+
+//   const [languageLoaded, setLanguageLoaded] = useState(false);
+//   const [darkMode, setDarkMode] = useState<boolean | null>(null);
+
+//   useEffect(() => {
+//     const loadLanguage = async () => {
+//       try {
+//         const lang = await AsyncStorage.getItem('appLanguage');
+//         const selectedLang = lang || 'en';
+//         await i18n.changeLanguage(selectedLang);
+
+//         // ضبط اتجاه التطبيق
+//         const isArabic = selectedLang === 'ar';
+//         if (I18nManager.isRTL !== isArabic) {
+//           I18nManager.forceRTL(isArabic);
+//         }
+
+//         setLanguageLoaded(true);
+//       } catch (error) {
+//         console.error('فشل تحميل اللغة:', error);
+//         setLanguageLoaded(true); // تجنب التوقف
+//       }
+//     };
+
+//     const loadDarkMode = async () => {
+//       try {
+//         const stored = await AsyncStorage.getItem('darkMode');
+//         setDarkMode(stored === 'true');
+//       } catch (error) {
+//         console.error('فشل تحميل الوضع الليلي:', error);
+//         setDarkMode(false);
+//       }
+//     };
+
+//     loadLanguage();
+//     loadDarkMode();
+//   }, []);
+
+//   useEffect(() => {
+//     if (fontsLoaded && languageLoaded && darkMode !== null) {
+//       SplashScreen.hideAsync();
+//     }
+//   }, [fontsLoaded, languageLoaded, darkMode]);
+
+//   if (!fontsLoaded || !languageLoaded || darkMode === null) {
+//     return (
+//       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+//         <ActivityIndicator size="large" />
+//       </View>
+//     );
+//   }
+
+//   return (
+//     <I18nextProvider i18n={i18n}>
+//       <RootLayoutNav darkMode={darkMode} />
+//     </I18nextProvider>
+//   );
+// }
+
+// function RootLayoutNav({ darkMode }: { darkMode: boolean }) {
+//   return (
+//     <ThemeProvider value={darkMode ? DarkTheme : DefaultTheme}>
+//       <Stack>
+//         <Stack.Screen name="splash" options={{ headerShown: false }} />
+//         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+//         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+//       </Stack>
+//     </ThemeProvider>
+//   );
+// }
+
+
+// app/_layout.tsx أو RootLayout.tsx حسب بنية المشروع
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/components/useColorScheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useState } from 'react';
-import { ActivityIndicator,Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { ActivityIndicator, View, I18nManager } from 'react-native';
+import { I18nextProvider } from 'react-i18next';
+import i18n from '../i18n';
 
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
+import { ThemeContext } from '../context/ThemeContext';
 
-export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: 'splash',
-};
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
+// ⛔️ منع شاشة البداية من الاختفاء التلقائي
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [loaded, error] = useFonts({
+  const [fontsLoaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
   });
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
+  const [languageLoaded, setLanguageLoaded] = useState(false);
+  const [darkMode, setDarkMode] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (loaded) {
+    const loadLanguage = async () => {
+      try {
+        const lang = await AsyncStorage.getItem('appLanguage');
+        const selectedLang = lang || 'en';
+        await i18n.changeLanguage(selectedLang);
+
+        const isArabic = selectedLang === 'ar';
+        if (I18nManager.isRTL !== isArabic) {
+          I18nManager.forceRTL(isArabic);
+        }
+
+        setLanguageLoaded(true);
+      } catch (error) {
+        console.error('فشل تحميل اللغة:', error);
+        setLanguageLoaded(true);
+      }
+    };
+
+    const loadDarkMode = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('darkMode');
+        setDarkMode(stored === 'true');
+      } catch (error) {
+        console.error('فشل تحميل الوضع الليلي:', error);
+        setDarkMode(false);
+      }
+    };
+
+    loadLanguage();
+    loadDarkMode();
+  }, []);
+
+  useEffect(() => {
+    if (fontsLoaded && languageLoaded && darkMode !== null) {
       SplashScreen.hideAsync();
     }
-  }, [loaded]);
+  }, [fontsLoaded, languageLoaded, darkMode]);
 
-  if (!loaded) {
-    return null;
+  const toggleDarkMode = async () => {
+    try {
+      const newMode = !darkMode;
+      await AsyncStorage.setItem('darkMode', newMode.toString());
+      setDarkMode(newMode);
+    } catch (error) {
+      console.error('فشل تغيير الوضع الليلي:', error);
+    }
+  };
+
+  if (!fontsLoaded || !languageLoaded || darkMode === null) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
   }
 
-  return <RootLayoutNav />;
-}
-
-function RootLayoutNav() {
-  const colorScheme = useColorScheme();
-
- 
-
-
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-             <Stack.Screen name="splash" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
+    <I18nextProvider i18n={i18n}>
+      <ThemeContext.Provider value={{ darkMode, toggleDarkMode }}>
+        <ThemeProvider value={darkMode ? DarkTheme : DefaultTheme}>
+          <Stack>
+            <Stack.Screen name="splash" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="auth/LoginScreen"
+              options={{
+                title: i18n.t('loginTitle') || 'تسجيل الدخول',
+                headerShown: true,
+                animation: 'slide_from_right',
+              }}
+            />
+
+            {/* شاشة التسجيل */}
+            <Stack.Screen
+              name="auth/RegisterScreen"
+              options={{
+                title: i18n.t('registerTitle') || 'تسجيل حساب جديد',
+                headerShown: true,
+                animation: 'slide_from_right',
+              }}
+            />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+          </Stack>
+        </ThemeProvider>
+      </ThemeContext.Provider>
+    </I18nextProvider>
   );
 }
