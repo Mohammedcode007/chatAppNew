@@ -11,6 +11,7 @@ import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeMode } from '@/context/ThemeContext';
+import CustomHeader from '@/components/CustomHeader';
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>['name'];
@@ -27,8 +28,9 @@ export default function TabLayout() {
     <Tabs
       key={scheme}
       screenOptions={{
+            headerShown: false, // ⬅️ هذا يخفي الهيدر من كل الشاشات
+
         tabBarActiveTintColor: Colors[scheme].tint,
-        headerShown: useClientOnlyValue(false, true),
         headerStyle: {
           backgroundColor: Colors[scheme].background,
         },
@@ -36,6 +38,7 @@ export default function TabLayout() {
         headerTitleStyle: {
           fontWeight: 'bold',
         },
+
       }}
     >
       <Tabs.Screen
@@ -45,21 +48,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <Ionicons name="chatbubble-ellipses-outline" size={25}
             color={color}
           />,
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable>
-                {({ pressed }) => (
-
-                  <FontAwesome
-                    name="info-circle"
-                    size={25}
-                    color={Colors[scheme].text}
-                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
-          ),
+         
         }}
       />
       <Tabs.Screen
