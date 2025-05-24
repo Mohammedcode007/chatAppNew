@@ -10,7 +10,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import i18n from '@/i18n';
 import Colors from '@/constants/Colors';
 import CustomHeader from '@/components/CustomHeader';
-
+import { Alert } from 'react-native';
+import axios from 'axios';
+import { router } from 'expo-router';
 export default function MoreScreen() {
     const { t } = useTranslation();
     const [muteNotifications, setMuteNotifications] = useState(false);
@@ -46,6 +48,33 @@ export default function MoreScreen() {
 
     const { darkMode, toggleDarkMode } = useThemeMode();
     const isRTL = language === 'ar';
+const logout = async () => {
+  try {
+    // استدعاء API تسجيل الخروج (اختياري)
+    const token = await AsyncStorage.getItem('authToken');
+    if (token) {
+        console.log(token);
+        
+      await axios.post(
+        'http://192.168.80.248:3000/logout',
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+    }
+
+    // حذف التوكن من التخزين المحلي
+    await AsyncStorage.removeItem('authToken');
+    await AsyncStorage.removeItem('hasSeenOnboarding');
+
+    // توجيه المستخدم لشاشة تسجيل الدخول
+    router.push('/auth/LoginScreen');
+  } catch (error) {
+    console.error('Logout error:', error);
+    Alert.alert('Logout Failed', 'Please try again later.');
+  }
+};
 
     return (
         <SafeAreaView style={[styles.safeArea, { backgroundColor: darkMode ? Colors.dark.background : Colors.light.background }]}>
@@ -136,7 +165,7 @@ export default function MoreScreen() {
                     icon="log-out-outline"
                     title={t('Log Out')}
                     direction={isRTL ? 'left' : 'right'}
-                    onPress={() => console.log('Log Out')}
+                    onPress={() => logout()}
                 />
                 <LanguageModal
                     visible={languageModalVisible}

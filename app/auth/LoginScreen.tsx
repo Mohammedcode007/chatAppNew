@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { I18nManager } from 'react-native';
+import { Alert, I18nManager } from 'react-native';
+import { connectSocket } from '@/utils/socket';
+import axios from 'axios';  // إذا لم تكن أضفته
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import i18n from 'i18next';  // تأكد من أنك مهيئ i18n في مشروعك
 import {
@@ -28,7 +30,7 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
   const [usernameError, setUsernameError] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     let valid = true;
 
     if (!username) {
@@ -47,8 +49,37 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
 
     if (!valid) return;
 
-    console.log('Logging in:', username);
+    try {
+      const response = await axios.post('http://192.168.80.248:3000/login', {
+        username,
+        password,
+      });
+
+      if (response.status !== 200 || !response.data.token) {
+        Alert.alert('Login Failed', 'Invalid username or password.');
+        return;
+      }
+
+      const { token } = response.data;
+
+      if (token) {
+        await AsyncStorage.setItem('authToken', token);
+      await AsyncStorage.setItem('hasSeenOnboarding', 'true');
+
+        router.push('/(tabs)');
+      } else {
+        await AsyncStorage.removeItem('authToken');
+        Alert.alert('Login Failed', 'Authentication token not received from server.');
+      }
+
+    } catch (error) {
+      console.error('Login error:', error);
+      Alert.alert('Login Failed', 'Please check your credentials or server connection.');
+    }
   };
+
+
+
 
   const handleNavigateToRegister = () => {
     router.push('/auth/RegisterScreen');
@@ -72,7 +103,7 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
   }, []);
 
   const isRTL = language === 'ar';
-    return (
+  return (
     <KeyboardAvoidingView
       style={[styles.container, darkMode && styles.containerDark]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

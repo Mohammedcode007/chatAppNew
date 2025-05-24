@@ -14,6 +14,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import Colors from '@/constants/Colors';
 import { useThemeMode } from '@/context/ThemeContext';
+import { useRouter } from 'expo-router';
 
 export default function CustomHeader() {
   const { darkMode } = useThemeMode();
@@ -46,16 +47,23 @@ export default function CustomHeader() {
   };
 
   // عند الضغط على إضافة صديق
-  const onAddFriend = () => {
-    closeModal();
-    alert('Opening Add Friend screen...');
-  };
+const router = useRouter();
+
+const onAddFriend = () => {
+  closeModal();
+  router.push('/SearchUserScreen'); // غيّر المسار حسب اسم الملف الفعلي للصفحة
+};
 
   // عند الضغط على إضافة جروب
   const onAddGroup = () => {
     closeModal();
     alert('Opening Add Group screen...');
   };
+   const onAddreqFriends = () => {
+    closeModal();
+  router.push('/FriendRequestsScreen'); // غيّر المسار حسب اسم الملف الفعلي للصفحة
+  };
+
 
   return (
     <View style={styles.container}>
@@ -97,6 +105,13 @@ export default function CustomHeader() {
               )}
             </Pressable>
             <Pressable onPress={handleAdd}>
+              {({ pressed }) => (
+                <View style={[styles.circle, { opacity: pressed ? 0.5 : 1 }]}>
+                  <AntDesign name="pluscircleo" size={20} color="#fff" />
+                </View>
+              )}
+            </Pressable>
+             <Pressable onPress={onAddreqFriends}>
               {({ pressed }) => (
                 <View style={[styles.circle, { opacity: pressed ? 0.5 : 1 }]}>
                   <AntDesign name="pluscircleo" size={20} color="#fff" />

@@ -117,6 +117,21 @@ export default function RootLayout() {
   }}
 />
 
+<Stack.Screen
+  name="/SearchUserScreen"
+  options={{
+    headerShown: true,
+    animation: 'slide_from_right',
+  }}
+/>
+<Stack.Screen
+  name="/FriendRequestsScreen"
+  options={{
+    headerShown: true,
+    animation: 'slide_from_right',
+  }}
+/>
+
 
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
