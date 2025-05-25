@@ -16,7 +16,9 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
 import AudioMessagePlayer from '@/components/AudioMessagePlayer';
-
+import { useNavigation } from 'expo-router';
+import { useLayoutEffect } from 'react';
+import GroupHeader from '@/components/GroupHeader';
 type Message = {
   id: string;
   type: 'text' | 'image' | 'audio';
@@ -35,12 +37,14 @@ export default function GroupChatScreen() {
 
   const flatListRef = useRef<FlatList>(null);
 
-  // تسجيل صوتي
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const navigation = useNavigation();
 
+useLayoutEffect(() => {
+  navigation.setOptions({ headerShown: false });
+}, []);
   useEffect(() => {
-    // تحميل الرسائل (مؤقتًا بيانات تجريبية)
     const initialMessages: Message[] = [
       {
         id: '1',
@@ -99,45 +103,52 @@ export default function GroupChatScreen() {
     }
   };
 
- 
-const startRecording = async () => {
-  try {
-    const permission = await Audio.requestPermissionsAsync();
-    if (permission.status !== 'granted') {
-      alert('يرجى السماح بالوصول إلى الميكروفون');
-      return;
+  const startRecording = async () => {
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      if (permission.status !== 'granted') {
+        alert('يرجى السماح بالوصول إلى الميكروفون');
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const recording = new Audio.Recording();
+
+      const recordingOptions = {
+        android: {
+          extension: '.m4a',
+          outputFormat: 2,
+          audioEncoder: 3,
+          sampleRate: 44100,
+          numberOfChannels: 2,
+          bitRate: 128000,
+        },
+        ios: {
+          extension: '.caf',
+          audioQuality: 127,
+          sampleRate: 44100,
+          numberOfChannels: 2,
+          bitRate: 128000,
+          linearPCMBitDepth: 16,
+          linearPCMIsBigEndian: false,
+          linearPCMIsFloat: false,
+        },
+        web: { mimeType: 'audio/webm', bitsPerSecond: 128000 },
+      };
+
+      await recording.prepareToRecordAsync(recordingOptions);
+      await recording.startAsync();
+
+      setRecording(recording);
+      setIsRecording(true);
+    } catch (error) {
+      console.error('حدث خطأ أثناء التسجيل:', error);
     }
-
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: true,
-      playsInSilentModeIOS: true,
-    });
-
-    const recording = new Audio.Recording();
-
-    const recordingOptions = {
-    android: {
-      extension: '.m4a', outputFormat: 2, audioEncoder: 3,
-      sampleRate: 44100, numberOfChannels: 2, bitRate: 128000,
-    },
-    ios: {
-      extension: '.caf', audioQuality: 127, sampleRate: 44100,
-      numberOfChannels: 2, bitRate: 128000, linearPCMBitDepth: 16,
-      linearPCMIsBigEndian: false, linearPCMIsFloat: false,
-    },
-    web: { mimeType: 'audio/webm', bitsPerSecond: 128000 },
   };
-
-    await recording.prepareToRecordAsync(recordingOptions);
-    await recording.startAsync();
-
-    setRecording(recording);
-    setIsRecording(true);
-  } catch (error) {
-    console.error('حدث خطأ أثناء التسجيل:', error);
-  }
-};
-
 
   const stopRecording = async () => {
     if (!recording) return;
@@ -164,19 +175,35 @@ const startRecording = async () => {
     }
   };
 
-  const renderMessage = ({ item }: { item: Message }) => {
-    const isMyMessage = item.sender === 'You';
+ const renderMessage = ({ item }: { item: Message }) => {
+  const isMyMessage = item.sender === 'You';
 
-    return (
+  return (
+    <View style={{ marginBottom: 2 }}>
+      {/* 👤 اسم المرسل */}
+      <Text
+        style={{
+          fontSize: 13,
+          color: darkMode ? '#aaa' : '#666',
+          alignSelf: isMyMessage ? 'flex-end' : 'flex-start',
+          marginBottom: 2,
+        }}
+      >
+        {isMyMessage ? 'أنت' : item.sender}
+      </Text>
+
+      {/* 💬 الرسالة نفسها */}
       <View
         style={[
           styles.messageContainer,
           isMyMessage ? styles.myMessage : styles.otherMessage,
-          darkMode && { backgroundColor: '#333' },
+          darkMode && { backgroundColor: isMyMessage ? '#0a84ff' : '#444' },
         ]}
       >
         {item.type === 'text' && (
-          <Text style={[styles.messageText, darkMode && { color: '#fff' }]}>{item.content}</Text>
+          <Text style={[styles.messageText, darkMode && { color: '#fff' }]}>
+            {item.content}
+          </Text>
         )}
 
         {item.type === 'image' && (
@@ -191,8 +218,10 @@ const startRecording = async () => {
           <AudioMessagePlayer uri={item.content} isMyMessage={isMyMessage} />
         )}
       </View>
-    );
-  };
+    </View>
+  );
+};
+
 
   return (
     <KeyboardAvoidingView
@@ -200,11 +229,8 @@ const startRecording = async () => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={90}
     >
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, darkMode && { color: '#fff' }]}>
-          {name || 'Group Chat'}
-        </Text>
-      </View>
+   <GroupHeader title={name || 'Group Chat'} membersCount={12} />
+
 
       <FlatList
         ref={flatListRef}
@@ -270,26 +296,34 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   messageContainer: {
-    marginBottom: 12,
-    padding: 10,
-    borderRadius: 10,
+    marginBottom: 2,
+    padding: 4,
+    borderRadius: 18,
     maxWidth: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   myMessage: {
     backgroundColor: '#DCF8C6',
     alignSelf: 'flex-end',
+    borderTopRightRadius: 0,
   },
   otherMessage: {
     backgroundColor: '#eee',
     alignSelf: 'flex-start',
+    borderTopLeftRadius: 0,
   },
   messageText: {
     fontSize: 16,
+    lineHeight: 22,
   },
   imageMessage: {
     width: 180,
     height: 120,
-    borderRadius: 10,
+    borderRadius: 12,
   },
   inputContainer: {
     flexDirection: 'row',
