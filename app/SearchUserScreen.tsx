@@ -1,6 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,6 +9,9 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import { useWebSocket } from '@/context/WebSocketContext'; // تأكد من المسار الصحيح حسب مشروعك
 
 interface User {
   _id: string;
@@ -21,50 +22,7 @@ const SearchUserScreen: React.FC = () => {
   const [query, setQuery] = useState<string>('');
   const [results, setResults] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const ws = useRef<WebSocket | null>(null);
-
-  // إنشاء اتصال WebSocket عند تحميل المكون
-  useEffect(() => {
-    const connectWebSocket = async () => {
-      const token = await AsyncStorage.getItem('authToken');
-      if (!token) {
-        Alert.alert('خطأ', 'الرجاء تسجيل الدخول أولاً.');
-        return;
-      }
-      console.log(token);
-      
-
-      // مثال رابط اتصال WebSocket مع التوكن واسم الغرفة
-      console.log('Connecting WS to:', `ws://192.168.80.248:3000/chat?token=${token}`);
-
-      ws.current = new WebSocket(`ws://192.168.80.248:3000/chat?token=${token}`);
-
-      ws.current.onopen = () => {
-        console.log('WebSocket connected');
-      };
-
-      ws.current.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        // يمكنك التعامل مع الرسائل الواردة هنا (مثلاً ردود طلب الصداقة)
-        console.log('Received WS message:', msg);
-      };
-
-      ws.current.onerror = (error) => {
-        console.error('WebSocket error:', error);
-      };
-
-      ws.current.onclose = (e) => {
-        console.log('WebSocket closed', e.code, e.reason);
-      };
-    };
-
-    connectWebSocket();
-
-    // تنظيف الاتصال عند الخروج
-    return () => {
-      ws.current?.close();
-    };
-  }, []);
+  const { ws } = useWebSocket();
 
   const handleSearch = async () => {
     if (!query.trim()) return;
@@ -98,8 +56,8 @@ const SearchUserScreen: React.FC = () => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
       ws.current.send(
         JSON.stringify({
-          type: 'friend_request_sent',  // نوع الرسالة لتحديدها في السيرفر
-          toUserId: userId,             // المعرف الخاص بالمستخدم المستلم
+          type: 'friend_request_sent',
+          toUserId: userId,
         })
       );
       Alert.alert('تم', 'تم إرسال طلب الصداقة عبر WebSocket!');
@@ -107,7 +65,6 @@ const SearchUserScreen: React.FC = () => {
       Alert.alert('خطأ', 'الاتصال غير متوفر الآن.');
     }
   };
-
 
   return (
     <View style={styles.container}>
@@ -152,9 +109,6 @@ const SearchUserScreen: React.FC = () => {
 };
 
 export default SearchUserScreen;
-
-// ... (نفس الستايلات التي زودتني بها)
-
 
 const styles = StyleSheet.create({
   container: {

@@ -1,143 +1,123 @@
-import React, { useEffect, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  Alert,
-  StyleSheet,
-} from 'react-native';
-import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFriendRequests } from '@/Hooks/useWebSocket';
+import React from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 
-interface FriendRequest {
-  _id: string;
-  sender: {
-    _id: string;
-    username: string;
-  };
-}
-
-const FriendRequestsScreen: React.FC = () => {
-  const [requests, setRequests] = useState<FriendRequest[]>([]);
-  const ws = useRef<WebSocket | null>(null);
-
-  const fetchRequests = async () => {
-    const token = await AsyncStorage.getItem('authToken');
-    const res = await axios.get('http://192.168.80.248:3000/friends/requests', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setRequests(res.data);
-  };
-
-  const connectWebSocket = async () => {
-    const token = await AsyncStorage.getItem('authToken');
-    const userId = await AsyncStorage.getItem('userId');
-    if (!token || !userId) return;
-
-    const socket = new WebSocket(`ws://192.168.80.248:3000?token=${token}&room=friends`);
-
-    socket.onopen = () => {
-      console.log('WebSocket connected [FriendRequestsScreen]');
-    };
-
-    socket.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.type === 'friend_request_received') {
-          console.log('Received new friend request');
-          fetchRequests(); // تحديث القائمة مباشرة
-        }
-      } catch (err) {
-        console.log('Invalid WS message', err);
-      }
-    };
-
-    socket.onerror = (e) => console.log('WebSocket error:', e);
-    socket.onclose = () => console.log('WebSocket closed [FriendRequestsScreen]');
-    ws.current = socket;
-  };
-
-  const respondRequest = async (requestId: string, accepted: boolean) => {
-    const token = await AsyncStorage.getItem('authToken');
-    await axios.post(
-      `http://192.168.80.248:3000/friends/respond`,
-      { requestId, accepted },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    Alert.alert('تم', accepted ? 'تم قبول الطلب' : 'تم رفض الطلب');
-    fetchRequests();
-  };
-
-  useEffect(() => {
-    fetchRequests();
-    connectWebSocket();
-
-    return () => {
-      if (ws.current) {
-        ws.current.close();
-      }
-    };
-  }, []);
+export default function FriendRequestsScreen() {
+  const {
+    friendRequests,
+    notifications,
+    respondToFriendRequest,
+  } = useFriendRequests();
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>طلبات الصداقة</Text>
+      {notifications.length > 0 && (
+        <View style={styles.notificationContainer}>
+          {notifications.map((note, i) => (
+            <Text key={i} style={styles.notificationText}>
+              {note}
+            </Text>
+          ))}
+        </View>
+      )}
+
+      <Text style={styles.heading}>طلبات الصداقة</Text>
+
       <FlatList
-        data={requests}
-        keyExtractor={(item) => item._id}
+        data={friendRequests}
+        keyExtractor={(item) => item.fromUserId}
         renderItem={({ item }) => (
           <View style={styles.card}>
-            <Text style={styles.username}>{item.sender.username}</Text>
-            <View style={styles.actions}>
+            <Text style={styles.username}>{item.fromUsername}</Text>
+            <View style={styles.buttonsContainer}>
               <TouchableOpacity
-                style={styles.accept}
-                onPress={() => respondRequest(item._id, true)}
+                style={[styles.button, styles.acceptButton]}
+                onPress={() => respondToFriendRequest(item.fromUserId, true)}
               >
-                <Text style={styles.btnText}>قبول</Text>
+                <Text style={styles.buttonText}>قبول</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.reject}
-                onPress={() => respondRequest(item._id, false)}
+                style={[styles.button, styles.rejectButton]}
+                onPress={() => respondToFriendRequest(item.fromUserId, false)}
               >
-                <Text style={styles.btnText}>رفض</Text>
+                <Text style={styles.buttonText}>رفض</Text>
               </TouchableOpacity>
             </View>
           </View>
         )}
-        ListEmptyComponent={<Text style={styles.emptyText}>لا توجد طلبات</Text>}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>لا توجد طلبات صداقة حالياً</Text>
+        }
       />
     </View>
   );
-};
-
-export default FriendRequestsScreen;
+}
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: '#f8f9fa' },
-  title: { fontSize: 20, fontWeight: 'bold', marginBottom: 10 },
+  container: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#f4f6fa',
+  },
+  notificationContainer: {
+    marginBottom: 15,
+    backgroundColor: '#e6ffe6',
+    padding: 10,
+    borderRadius: 8,
+  },
+  notificationText: {
+    color: '#2e7d32',
+    fontSize: 14,
+    marginBottom: 5,
+  },
+  heading: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#333',
+  },
   card: {
     backgroundColor: '#fff',
-    padding: 14,
+    padding: 15,
+    marginBottom: 12,
     borderRadius: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  username: {
+    fontSize: 16,
+    fontWeight: '600',
     marginBottom: 10,
+    color: '#444',
+  },
+  buttonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  button: {
+    flex: 1,
+    paddingVertical: 8,
+    marginHorizontal: 5,
+    borderRadius: 6,
     alignItems: 'center',
   },
-  username: { fontSize: 16 },
-  actions: { flexDirection: 'row' },
-  accept: {
-    backgroundColor: '#28a745',
-    padding: 8,
-    borderRadius: 8,
-    marginRight: 8,
+  acceptButton: {
+    backgroundColor: '#4caf50',
   },
-  reject: {
-    backgroundColor: '#dc3545',
-    padding: 8,
-    borderRadius: 8,
+  rejectButton: {
+    backgroundColor: '#f44336',
   },
-  btnText: { color: '#fff', fontWeight: 'bold' },
-  emptyText: { textAlign: 'center', marginTop: 20, color: '#777' },
+  buttonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#888',
+    fontSize: 16,
+    marginTop: 40,
+  },
 });

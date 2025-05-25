@@ -15,6 +15,7 @@ import { I18nextProvider } from 'react-i18next';
 import i18n from '../i18n';
 
 import { ThemeContext } from '../context/ThemeContext';
+import { WebSocketProvider } from '@/context/WebSocketContext';
 
 // ⛔️ منع شاشة البداية من الاختفاء التلقائي
 SplashScreen.preventAutoHideAsync();
@@ -86,6 +87,8 @@ export default function RootLayout() {
   }
 
   return (
+        <WebSocketProvider>
+
     <I18nextProvider i18n={i18n}>
       <ThemeContext.Provider value={{ darkMode, toggleDarkMode }}>
         <ThemeProvider value={darkMode ? DarkTheme : DefaultTheme}>
@@ -109,28 +112,28 @@ export default function RootLayout() {
                 animation: 'slide_from_right',
               }}
             />
-<Stack.Screen
-  name="/[userId]/index"
-  options={{
-    headerShown: true,
-    animation: 'slide_from_right',
-  }}
-/>
+            <Stack.Screen
+              name="/[userId]/index"
+              options={{
+                headerShown: true,
+                animation: 'slide_from_right',
+              }}
+            />
 
-<Stack.Screen
-  name="/SearchUserScreen"
-  options={{
-    headerShown: true,
-    animation: 'slide_from_right',
-  }}
-/>
-<Stack.Screen
-  name="/FriendRequestsScreen"
-  options={{
-    headerShown: true,
-    animation: 'slide_from_right',
-  }}
-/>
+            <Stack.Screen
+              name="/SearchUserScreen"
+              options={{
+                headerShown: true,
+                animation: 'slide_from_right',
+              }}
+            />
+            <Stack.Screen
+              name="/FriendRequestsScreen"
+              options={{
+                headerShown: true,
+                animation: 'slide_from_right',
+              }}
+            />
 
 
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -139,5 +142,7 @@ export default function RootLayout() {
         </ThemeProvider>
       </ThemeContext.Provider>
     </I18nextProvider>
+        </WebSocketProvider>
+
   );
 }

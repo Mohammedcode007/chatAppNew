@@ -12,6 +12,7 @@ import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeMode } from '@/context/ThemeContext';
 import CustomHeader from '@/components/CustomHeader';
+import { WebSocketProvider } from '@/context/WebSocketContext';
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>['name'];
@@ -25,6 +26,7 @@ export default function TabLayout() {
   const scheme = (darkMode ? 'dark' : 'light') as 'light' | 'dark';
 
   return (
+
     <Tabs
       key={scheme}
       screenOptions={{
@@ -80,5 +82,6 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+
   );
 }

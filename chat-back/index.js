@@ -5,6 +5,7 @@ const bodyParser = require('body-parser');
 const { createFriendRequestServer } = require('./websocket/chatServer');
 const authController = require('./controllers/auth');
 const userController = require('./controllers/userController');
+const friendsController = require('./controllers/friendController');
 
 
 const { HTTP_PORT, MONGO_URI } = require('./config');
@@ -25,6 +26,8 @@ app.post('/signup', authController.signup);
 app.post('/login', authController.login);
 app.post('/logout', authMiddleware, authController.logout);
 app.get('/search', userController.searchUsers);
+app.post('/friends/requests',authMiddleware, friendsController.respondToFriendRequest);
+app.get('/friends/requests', authMiddleware, friendsController.getFriendRequests);
 
 // إنشاء WebSocket server
 createFriendRequestServer(server);
