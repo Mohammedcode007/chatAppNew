@@ -113,13 +113,29 @@ export default function RootLayout() {
               }}
             />
             <Stack.Screen
+<<<<<<< HEAD
               name="/[userId]/index"
+=======
+              name="/chat/[userId]/index"
+>>>>>>> 5fee39b82c7ebe85dee0d5938d9e0acb130f23ff
               options={{
                 headerShown: true,
                 animation: 'slide_from_right',
               }}
             />
+<<<<<<< HEAD
 
+=======
+            <Stack.Screen
+              name="/group/[groupId]/index"
+              options={{
+                headerShown: false,
+                animation: 'slide_from_right',
+              }}
+            />
+
+
+>>>>>>> 5fee39b82c7ebe85dee0d5938d9e0acb130f23ff
             <Stack.Screen
               name="/SearchUserScreen"
               options={{
