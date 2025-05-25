@@ -109,28 +109,36 @@ export default function RootLayout() {
                 animation: 'slide_from_right',
               }}
             />
-<Stack.Screen
-  name="/[userId]/index"
-  options={{
-    headerShown: true,
-    animation: 'slide_from_right',
-  }}
-/>
+            <Stack.Screen
+              name="/chat/[userId]/index"
+              options={{
+                headerShown: true,
+                animation: 'slide_from_right',
+              }}
+            />
+            <Stack.Screen
+              name="/group/[groupId]/index"
+              options={{
+                headerShown: false,
+                animation: 'slide_from_right',
+              }}
+            />
 
-<Stack.Screen
-  name="/SearchUserScreen"
-  options={{
-    headerShown: true,
-    animation: 'slide_from_right',
-  }}
-/>
-<Stack.Screen
-  name="/FriendRequestsScreen"
-  options={{
-    headerShown: true,
-    animation: 'slide_from_right',
-  }}
-/>
+
+            <Stack.Screen
+              name="/SearchUserScreen"
+              options={{
+                headerShown: true,
+                animation: 'slide_from_right',
+              }}
+            />
+            <Stack.Screen
+              name="/FriendRequestsScreen"
+              options={{
+                headerShown: true,
+                animation: 'slide_from_right',
+              }}
+            />
 
 
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

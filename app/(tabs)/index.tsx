@@ -78,7 +78,7 @@ export default function ChatsScreen() {
           return (
             <TouchableOpacity
               style={dynamicStyles.chatItem}
-              onPress={() => router.push(`/${item.id}?name=${encodeURIComponent(item.name)}`)}
+              onPress={() => router.push(`/chat/${item.id}?name=${encodeURIComponent(item.name)}`)}
             >
               <Image source={{ uri: item.avatar }} style={dynamicStyles.avatar} />
               <View style={dynamicStyles.chatContent}>
