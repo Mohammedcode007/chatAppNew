@@ -77,6 +77,7 @@ const User = require('../../models/user');
 const FriendRequest = require('../../models/friendRequest');
 const { getPendingFriendRequests } = require('../utils/getPendingRequests');
 const { sendToUser, sendFriendRequestList } = require('../utils/sendToUser');
+const Item = require('../../models/item'); // عدّل المسار حسب موقع الملف
 
 async function handleMessage(message, ws, userSockets) {
   let msg;

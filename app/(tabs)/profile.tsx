@@ -24,6 +24,7 @@ import { Picker } from '@react-native-picker/picker';
 // **استيراد مكتبة اختيار الصور**
 import * as ImagePicker from 'expo-image-picker';
 import { useThemeMode } from '@/context/ThemeContext';
+import { useUserProfile } from '@/Hooks/useUserProfile';
 const windowWidth = Dimensions.get('window').width;
 
 const user = {
@@ -65,7 +66,11 @@ export default function ProfileScreen() {
   const [inputValue, setInputValue] = useState('');
   const [dateValue, setDateValue] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const { profile, updateProfile, notifications } = useUserProfile();
 
+  const handleUsernameChange = () => {
+    updateProfile({ username: '4اسم جديد' });
+  };
   // فتح المودال مع تهيئة البيانات حسب نوع الحقل
   const openEditModal = (key: string, currentValue: string) => {
     setCurrentEditKey(key);
@@ -343,7 +348,7 @@ export default function ProfileScreen() {
                   <Text>إلغاء</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={handleSave}
+                  onPress={handleUsernameChange}
                   style={[styles.modalButton, { backgroundColor: '#4CAF50' }]}
                 >
                   <Text style={{ color: '#fff' }}>حفظ</Text>
