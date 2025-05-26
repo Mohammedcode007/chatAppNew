@@ -87,78 +87,77 @@ export default function RootLayout() {
   }
 
   return (
-        <WebSocketProvider>
+    <WebSocketProvider>
 
-    <I18nextProvider i18n={i18n}>
-      <ThemeContext.Provider value={{ darkMode, toggleDarkMode }}>
-        <ThemeProvider value={darkMode ? DarkTheme : DefaultTheme}>
-          <Stack>
-            <Stack.Screen name="splash" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="auth/LoginScreen"
-              options={{
-                title: i18n.t('loginTitle') || 'تسجيل الدخول',
-                headerShown: true,
-                animation: 'slide_from_right',
-              }}
-            />
+      <I18nextProvider i18n={i18n}>
+        <ThemeContext.Provider value={{ darkMode, toggleDarkMode }}>
+          <ThemeProvider value={darkMode ? DarkTheme : DefaultTheme}>
+            <Stack>
+              <Stack.Screen name="splash" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="auth/LoginScreen"
+                options={{
+                  title: i18n.t('loginTitle') || 'تسجيل الدخول',
+                  headerShown: true,
+                  animation: 'slide_from_right',
+                }}
+              />
 
-            {/* شاشة التسجيل */}
-            <Stack.Screen
-              name="auth/RegisterScreen"
-              options={{
-                title: i18n.t('registerTitle') || 'تسجيل حساب جديد',
-                headerShown: true,
-                animation: 'slide_from_right',
-              }}
-            />
-            <Stack.Screen
-<<<<<<< HEAD
-              name="/[userId]/index"
-=======
-              name="/chat/[userId]/index"
->>>>>>> 5fee39b82c7ebe85dee0d5938d9e0acb130f23ff
-              options={{
-                headerShown: true,
-                animation: 'slide_from_right',
-              }}
-            />
-<<<<<<< HEAD
+              {/* شاشة التسجيل */}
+              <Stack.Screen
+                name="auth/RegisterScreen"
+                options={{
+                  title: i18n.t('registerTitle') || 'تسجيل حساب جديد',
+                  headerShown: true,
+                  animation: 'slide_from_right',
+                }}
+              />
+              <Stack.Screen
+                name="/chat/[userId]/index"
+                options={{
+                  headerShown: true,
+                  animation: 'slide_from_right',
+                }}
+              />
 
-=======
-            <Stack.Screen
-              name="/group/[groupId]/index"
-              options={{
-                headerShown: false,
-                animation: 'slide_from_right',
-              }}
-            />
+              <Stack.Screen
+                name="/group/[groupId]/index"
+                options={{
+                  headerShown: false,
+                  animation: 'slide_from_right',
+                }}
+              />
+              <Stack.Screen
+                name="/group/[settingId]/index"
+                options={{
+                  headerShown: false,
+                  animation: 'slide_from_right',
+                }}
+              />
+
+              <Stack.Screen
+                name="/SearchUserScreen"
+                options={{
+                  headerShown: true,
+                  animation: 'slide_from_right',
+                }}
+              />
+              <Stack.Screen
+                name="/FriendRequestsScreen"
+                options={{
+                  headerShown: true,
+                  animation: 'slide_from_right',
+                }}
+              />
 
 
->>>>>>> 5fee39b82c7ebe85dee0d5938d9e0acb130f23ff
-            <Stack.Screen
-              name="/SearchUserScreen"
-              options={{
-                headerShown: true,
-                animation: 'slide_from_right',
-              }}
-            />
-            <Stack.Screen
-              name="/FriendRequestsScreen"
-              options={{
-                headerShown: true,
-                animation: 'slide_from_right',
-              }}
-            />
-
-
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-          </Stack>
-        </ThemeProvider>
-      </ThemeContext.Provider>
-    </I18nextProvider>
-        </WebSocketProvider>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+            </Stack>
+          </ThemeProvider>
+        </ThemeContext.Provider>
+      </I18nextProvider>
+    </WebSocketProvider>
 
   );
 }

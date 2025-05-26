@@ -41,9 +41,9 @@ export default function GroupChatScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const navigation = useNavigation();
 
-useLayoutEffect(() => {
-  navigation.setOptions({ headerShown: false });
-}, []);
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerShown: false });
+  }, []);
   useEffect(() => {
     const initialMessages: Message[] = [
       {
@@ -175,52 +175,52 @@ useLayoutEffect(() => {
     }
   };
 
- const renderMessage = ({ item }: { item: Message }) => {
-  const isMyMessage = item.sender === 'You';
+  const renderMessage = ({ item }: { item: Message }) => {
+    const isMyMessage = item.sender === 'You';
 
-  return (
-    <View style={{ marginBottom: 2 }}>
-      {/* 👤 اسم المرسل */}
-      <Text
-        style={{
-          fontSize: 13,
-          color: darkMode ? '#aaa' : '#666',
-          alignSelf: isMyMessage ? 'flex-end' : 'flex-start',
-          marginBottom: 2,
-        }}
-      >
-        {isMyMessage ? 'أنت' : item.sender}
-      </Text>
+    return (
+      <View style={{ marginBottom: 2 }}>
+        {/* 👤 اسم المرسل */}
+        <Text
+          style={{
+            fontSize: 13,
+            color: darkMode ? '#aaa' : '#666',
+            alignSelf: isMyMessage ? 'flex-end' : 'flex-start',
+            marginBottom: 2,
+          }}
+        >
+          {isMyMessage ? 'أنت' : item.sender}
+        </Text>
 
-      {/* 💬 الرسالة نفسها */}
-      <View
-        style={[
-          styles.messageContainer,
-          isMyMessage ? styles.myMessage : styles.otherMessage,
-          darkMode && { backgroundColor: isMyMessage ? '#0a84ff' : '#444' },
-        ]}
-      >
-        {item.type === 'text' && (
-          <Text style={[styles.messageText, darkMode && { color: '#fff' }]}>
-            {item.content}
-          </Text>
-        )}
+        {/* 💬 الرسالة نفسها */}
+        <View
+          style={[
+            styles.messageContainer,
+            isMyMessage ? styles.myMessage : styles.otherMessage,
+            darkMode && { backgroundColor: isMyMessage ? '#0a84ff' : '#444' },
+          ]}
+        >
+          {item.type === 'text' && (
+            <Text style={[styles.messageText, darkMode && { color: '#fff' }]}>
+              {item.content}
+            </Text>
+          )}
 
-        {item.type === 'image' && (
-          <Image
-            source={{ uri: item.content }}
-            style={styles.imageMessage}
-            resizeMode="cover"
-          />
-        )}
+          {item.type === 'image' && (
+            <Image
+              source={{ uri: item.content }}
+              style={styles.imageMessage}
+              resizeMode="cover"
+            />
+          )}
 
-        {item.type === 'audio' && (
-          <AudioMessagePlayer uri={item.content} isMyMessage={isMyMessage} />
-        )}
+          {item.type === 'audio' && (
+            <AudioMessagePlayer uri={item.content} isMyMessage={isMyMessage} />
+          )}
+        </View>
       </View>
-    </View>
-  );
-};
+    );
+  };
 
 
   return (
@@ -229,7 +229,7 @@ useLayoutEffect(() => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={90}
     >
-   <GroupHeader title={name || 'Group Chat'} membersCount={12} />
+      <GroupHeader title={name || 'Group Chat'} membersCount={12} settingId="45" />
 
 
       <FlatList

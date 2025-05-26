@@ -3,17 +3,21 @@ import { View, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-nati
 import { Text } from '@/components/Themed';
 import { Ionicons, Entypo, Feather, MaterialIcons, AntDesign } from '@expo/vector-icons';
 import { useThemeMode } from '@/context/ThemeContext';
-import { useNavigation } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
 
 type Props = {
   title: string;
   membersCount?: number;
+  settingId: string;
+
 };
 
-export default function GroupHeader({ title, membersCount }: Props) {
+export default function GroupHeader({ title, membersCount, settingId }: Props) {
   const { darkMode } = useThemeMode();
   const navigation = useNavigation();
   const [menuVisible, setMenuVisible] = useState(false);
+  const router = useRouter();
+console.log('Navigating to group setting:', settingId);
 
   const handleOptionPress = (option: string) => {
     setMenuVisible(false);
@@ -23,6 +27,8 @@ export default function GroupHeader({ title, membersCount }: Props) {
         // تنفيذ مغادرة المجموعة
         break;
       case 'settings':
+        router.push(`/group/settings/${settingId}`);
+
         // فتح صفحة الإعدادات
         break;
       case 'invite':

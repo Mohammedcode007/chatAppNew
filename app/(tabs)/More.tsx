@@ -48,38 +48,38 @@ export default function MoreScreen() {
 
     const { darkMode, toggleDarkMode } = useThemeMode();
     const isRTL = language === 'ar';
-const logout = async () => {
-  try {
-    // استدعاء API تسجيل الخروج (اختياري)
-    const token = await AsyncStorage.getItem('authToken');
-    if (token) {
-        console.log(token);
-        
-      await axios.post(
-        'http://192.168.80.248:3000/logout',
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
+    const logout = async () => {
+        try {
+            // استدعاء API تسجيل الخروج (اختياري)
+            const token = await AsyncStorage.getItem('authToken');
+            if (token) {
+                console.log(token);
+
+                await axios.post(
+                    'http://192.168.80.248:3000/logout',
+                    {},
+                    {
+                        headers: { Authorization: `Bearer ${token}` },
+                    }
+                );
+            }
+
+            // حذف التوكن من التخزين المحلي
+            await AsyncStorage.removeItem('authToken');
+            await AsyncStorage.removeItem('hasSeenOnboarding');
+
+            // توجيه المستخدم لشاشة تسجيل الدخول
+            router.push('/auth/LoginScreen');
+        } catch (error) {
+            console.error('Logout error:', error);
+            Alert.alert('Logout Failed', 'Please try again later.');
         }
-      );
-    }
-
-    // حذف التوكن من التخزين المحلي
-    await AsyncStorage.removeItem('authToken');
-    await AsyncStorage.removeItem('hasSeenOnboarding');
-
-    // توجيه المستخدم لشاشة تسجيل الدخول
-    router.push('/auth/LoginScreen');
-  } catch (error) {
-    console.error('Logout error:', error);
-    Alert.alert('Logout Failed', 'Please try again later.');
-  }
-};
+    };
 
     return (
         <SafeAreaView style={[styles.safeArea, { backgroundColor: darkMode ? Colors.dark.background : Colors.light.background }]}>
-                  <CustomHeader />
-            
+            <CustomHeader />
+
             <ScrollView
                 style={[styles.container, isRTL && styles.rtl]}
                 contentContainerStyle={{ flexDirection: 'column' }}

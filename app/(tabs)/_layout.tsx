@@ -53,6 +53,15 @@ export default function TabLayout() {
          
         }}
       />
+        <Tabs.Screen
+        name="friends"  // اسم ملف الشاشة الخاصة بالأصدقاء داخل مجلد screens
+        options={{
+          title: 'Friends',
+          tabBarIcon: ({ color }) => (
+            <FontAwesome6 name="users" size={25} color={color} />
+          ),
+        }}
+      />
       <Tabs.Screen
         name="Greoups"
         options={{

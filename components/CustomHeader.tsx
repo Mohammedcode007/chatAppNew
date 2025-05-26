@@ -15,6 +15,7 @@ import AntDesign from '@expo/vector-icons/AntDesign';
 import Colors from '@/constants/Colors';
 import { useThemeMode } from '@/context/ThemeContext';
 import { useRouter } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
 
 export default function CustomHeader() {
   const { darkMode } = useThemeMode();
@@ -47,24 +48,24 @@ export default function CustomHeader() {
   };
 
   // عند الضغط على إضافة صديق
-const router = useRouter();
+  const router = useRouter();
 
-const onAddFriend = () => {
-  closeModal();
-  router.push('/SearchUserScreen'); // غيّر المسار حسب اسم الملف الفعلي للصفحة
-};
+  const onAddFriend = () => {
+    closeModal();
+    router.push('/SearchUserScreen'); // غيّر المسار حسب اسم الملف الفعلي للصفحة
+  };
 
   // عند الضغط على إضافة جروب
   const onAddGroup = () => {
     closeModal();
     alert('Opening Add Group screen...');
   };
-   const onAddreqFriends = () => {
+  const onAddreqFriends = () => {
     closeModal();
-  router.push('/FriendRequestsScreen'); // غيّر المسار حسب اسم الملف الفعلي للصفحة
+    router.push('/FriendRequestsScreen'); // غيّر المسار حسب اسم الملف الفعلي للصفحة
   };
 
-
+  const count = 5
   return (
     <View style={styles.container}>
       {/* حقل البحث */}
@@ -111,12 +112,17 @@ const onAddFriend = () => {
                 </View>
               )}
             </Pressable>
-             <Pressable onPress={onAddreqFriends}>
-              {({ pressed }) => (
-                <View style={[styles.circle, { opacity: pressed ? 0.5 : 1 }]}>
-                  <AntDesign name="pluscircleo" size={20} color="#fff" />
-                </View>
-              )}
+            <Pressable onPress={onAddreqFriends} style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}>
+              <View style={styles.iconContainer}>
+                <MaterialIcons name="notifications-none" size={24} color="#fff" />
+                {count > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {count > 99 ? '99+' : count}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </Pressable>
           </View>
         </>
@@ -267,5 +273,36 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     color: '#888',
+  },
+  iconContainer: {
+        backgroundColor: '#6A2D91',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  badge: {
+    position: 'absolute',
+    right: -6,
+    top: -3,
+    backgroundColor: 'red',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });

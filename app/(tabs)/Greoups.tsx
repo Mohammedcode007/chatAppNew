@@ -1,15 +1,19 @@
-import CustomHeader from '@/components/CustomHeader';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Image,
   TouchableOpacity,
+  I18nManager,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 import { SwipeListView } from 'react-native-swipe-list-view';
+import { Ionicons } from '@expo/vector-icons';
+import CustomHeader from '@/components/CustomHeader';
+import i18n from '@/i18n'; // نفترض ملف إعدادات الترجمة
+import { useThemeMode } from '@/context/ThemeContext';
 
 const initialGroupChats = [
   {
@@ -37,23 +41,37 @@ const initialGroupChats = [
 
 export default function GroupChatsScreen() {
   const [groupChats, setGroupChats] = useState(initialGroupChats);
+  const [language, setLanguage] = useState('en');
+  const { darkMode, toggleDarkMode } = useThemeMode();
+  const isRTL = language === 'ar';
+  const router = useRouter();
+
+  useEffect(() => {
+    const getStoredLang = async () => {
+      const lang = await AsyncStorage.getItem('appLanguage');
+      if (lang) {
+        setLanguage(lang);
+        i18n.changeLanguage(lang);
+        // تغيير اتجاه النص حسب اللغة (RTL للعربية فقط)
+        I18nManager.forceRTL(lang === 'ar');
+      }
+    };
+    getStoredLang();
+  }, []);
 
   const handlePin = (id: string) => {
     console.log('Pin group:', id);
-    // هنا يمكن إضافة منطق التثبيت (مثل ترتيب العناصر)
+    // منطق التثبيت
   };
 
   const handleMute = (id: string) => {
     console.log('Mute group:', id);
-    // هنا يمكن إضافة منطق كتم المحادثة
+    // منطق كتم المحادثة
   };
 
   const handleLeave = (id: string) => {
-    console.log('Leave group:', id);
-    // إزالة المجموعة من القائمة عند الخروج
     setGroupChats((prev) => prev.filter((group) => group.id !== id));
   };
-  const router = useRouter();
 
   const renderItem = ({ item }: { item: typeof initialGroupChats[0] }) => {
     const displayAvatars = item.members.slice(0, 2);
@@ -61,48 +79,76 @@ export default function GroupChatsScreen() {
 
     return (
       <TouchableOpacity
-        style={styles.card}
-        onPress={() => router.push(`/group/${item.id}?name=${encodeURIComponent(item.name)}`)}
+        style={[styles.card, darkMode && styles.cardDark, isRTL && styles.rtlRow]}
+        onPress={() =>
+          router.push(`/group/${item.id}?name=${encodeURIComponent(item.name)}`)
+        }
       >
-        <View style={styles.row}>
-          <View style={styles.avatarsRow}>
+        <View style={[styles.row, isRTL && styles.rtlRow]}>
+          <View style={[styles.avatarsRow, isRTL && styles.rtlAvatarsRow]}>
             {displayAvatars.map((member, index) => (
               <Image
                 key={member.id}
                 source={{ uri: member.avatar }}
-                style={[styles.avatar, { marginLeft: index === 0 ? 0 : -30 }]}
+                style={[
+                  styles.avatar,
+                  isRTL
+                    ? { marginRight: index === 0 ? 0 : -30 }
+                    : { marginLeft: index === 0 ? 0 : -30 },
+                ]}
               />
             ))}
             {remaining > 0 && (
-              <View style={[styles.avatar, styles.remainingAvatar, { marginLeft: -30 }]}>
+              <View
+                style={[
+                  styles.avatar,
+                  styles.remainingAvatar,
+                  isRTL ? { marginRight: -30 } : { marginLeft: -30 },
+                ]}
+              >
                 <Text style={styles.remainingText}>+{remaining}</Text>
               </View>
             )}
           </View>
 
           <View style={styles.info}>
-            <View style={styles.nameRow}>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.dot}> · </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="people" size={16} color="#888" style={{ marginRight: 4 }} />
-                <Text style={styles.membersCount}>{item.membersCount}</Text>
+            <View style={[styles.nameRow, isRTL && styles.rtlRow]}>
+              <Text style={[styles.name, darkMode && styles.textDark]}>
+                {item.name}
+              </Text>
+              <Text style={[styles.dot, darkMode && styles.textDark]}> · </Text>
+              <View
+                style={[
+                  { flexDirection: 'row', alignItems: 'center' },
+                  isRTL && { flexDirection: 'row-reverse' },
+                ]}
+              >
+                <Ionicons
+                  name="people"
+                  size={16}
+                  color={darkMode ? '#ccc' : '#888'}
+                  style={{ marginRight: isRTL ? 0 : 4, marginLeft: isRTL ? 4 : 0 }}
+                />
+                <Text style={[styles.membersCount, darkMode && styles.textDark]}>
+                  {item.membersCount}
+                </Text>
               </View>
             </View>
             <Text
-              style={styles.lastMessage}
+              style={[styles.lastMessage, darkMode && styles.textDark]}
               numberOfLines={1}
               ellipsizeMode="tail"
             >
-              Last message: {item.lastMessage}
+              {i18n.t('Last message')}: {item.lastMessage}
             </Text>
           </View>
         </View>
-      </TouchableOpacity>);
+      </TouchableOpacity>
+    );
   };
 
   const renderHiddenItem = (data: any) => (
-    <View style={styles.hiddenRow}>
+    <View style={[styles.hiddenRow, isRTL && styles.rtlHiddenRow]}>
       <TouchableOpacity
         style={styles.actionButtonPin}
         onPress={() => handlePin(data.item.id)}
@@ -125,18 +171,18 @@ export default function GroupChatsScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, darkMode && styles.containerDark]}>
       <CustomHeader />
       <SwipeListView
         data={groupChats}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         renderHiddenItem={renderHiddenItem}
-        leftOpenValue={240} // يسمح بعرض 3 أزرار
-        stopLeftSwipe={240} // يمنع السحب الزائد
-        disableRightSwipe={false} // يمنع السحب لليسار
-        closeOnRowPress={false}  // منع الإغلاق عند الضغط على الصف
-        closeOnScroll={false}    // منع الإغلاق عند التمرير
+        leftOpenValue={240}
+        stopLeftSwipe={240}
+        disableRightSwipe={false}
+        closeOnRowPress={false}
+        closeOnScroll={false}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         contentContainerStyle={{ paddingVertical: 8 }}
       />
@@ -149,18 +195,32 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  containerDark: {
+    backgroundColor: '#121212',
+  },
   card: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#fff',
   },
+  cardDark: {
+    backgroundColor: '#222',
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  rtlRow: {
+    flexDirection: 'row-reverse',
+  },
   avatarsRow: {
     flexDirection: 'row',
     marginRight: 12,
+  },
+  rtlAvatarsRow: {
+    marginRight: 0,
+    marginLeft: 12,
+    flexDirection: 'row-reverse',
   },
   avatar: {
     width: 36,
@@ -206,6 +266,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#333',
   },
+  textDark: {
+    color: '#ccc',
+  },
   separator: {
     height: 1,
     backgroundColor: '#e0e0e0',
@@ -217,6 +280,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#f2f2f2',
     height: '100%',
     paddingLeft: 16,
+  },
+  rtlHiddenRow: {
+    flexDirection: 'row-reverse',
+    paddingLeft: 0,
+    paddingRight: 16,
   },
   actionButtonPin: {
     backgroundColor: '#FFD700',
