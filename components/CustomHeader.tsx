@@ -16,6 +16,7 @@ import Colors from '@/constants/Colors';
 import { useThemeMode } from '@/context/ThemeContext';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useFriendRequests } from '@/Hooks/useWebSocket';
 
 export default function CustomHeader() {
   const { darkMode } = useThemeMode();
@@ -24,7 +25,11 @@ export default function CustomHeader() {
   const [modalVisible, setModalVisible] = useState(false);
   const [searchActive, setSearchActive] = useState(false);
   const [searchText, setSearchText] = useState('');
-
+  const {
+    friendRequests,
+    notifications,
+    respondToFriendRequest,
+  } = useFriendRequests();
   // فتح البحث
   const handleSearch = () => {
     setSearchActive(true);
@@ -115,10 +120,10 @@ export default function CustomHeader() {
             <Pressable onPress={onAddreqFriends} style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}>
               <View style={styles.iconContainer}>
                 <MaterialIcons name="notifications-none" size={24} color="#fff" />
-                {count > 0 && (
+                {friendRequests.length > 0 && (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>
-                      {count > 99 ? '99+' : count}
+                      {friendRequests.length > 99 ? '99+' : friendRequests.length}
                     </Text>
                   </View>
                 )}

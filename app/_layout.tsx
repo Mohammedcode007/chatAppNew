@@ -8,6 +8,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
+import { Provider } from 'react-redux';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, View, I18nManager } from 'react-native';
@@ -16,6 +17,8 @@ import i18n from '../i18n';
 
 import { ThemeContext } from '../context/ThemeContext';
 import { WebSocketProvider } from '@/context/WebSocketContext';
+import store, { persistor } from '@/store';
+import { PersistGate } from 'redux-persist/integration/react';
 
 // ⛔️ منع شاشة البداية من الاختفاء التلقائي
 SplashScreen.preventAutoHideAsync();
@@ -88,75 +91,87 @@ export default function RootLayout() {
 
   return (
     <WebSocketProvider>
+      <Provider store={store}>
+        <PersistGate
+          loading={
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <ActivityIndicator size="large" />
+            </View>
+          }
+          persistor={persistor}
+        >
+          <I18nextProvider i18n={i18n}>
+            <ThemeContext.Provider value={{ darkMode, toggleDarkMode }}>
+              <ThemeProvider value={darkMode ? DarkTheme : DefaultTheme}>
+                <Stack>
+                  <Stack.Screen name="splash" options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="auth/LoginScreen"
+                    options={{
+                      title: i18n.t('loginTitle') || 'تسجيل الدخول',
+                      headerShown: true,
+                      animation: 'slide_from_right',
+                    }}
+                  />
 
-      <I18nextProvider i18n={i18n}>
-        <ThemeContext.Provider value={{ darkMode, toggleDarkMode }}>
-          <ThemeProvider value={darkMode ? DarkTheme : DefaultTheme}>
-            <Stack>
-              <Stack.Screen name="splash" options={{ headerShown: false }} />
-              <Stack.Screen
-                name="auth/LoginScreen"
-                options={{
-                  title: i18n.t('loginTitle') || 'تسجيل الدخول',
-                  headerShown: true,
-                  animation: 'slide_from_right',
-                }}
-              />
+                  {/* شاشة التسجيل */}
+                  <Stack.Screen
+                    name="auth/RegisterScreen"
+                    options={{
+                      title: i18n.t('registerTitle') || 'تسجيل حساب جديد',
+                      headerShown: true,
+                      animation: 'slide_from_right',
+                    }}
+                  />
+                  <Stack.Screen
+                    name="/chat/[userId]/index"
+                    options={{
+                      headerShown: true,
+                      animation: 'slide_from_right',
+                    }}
+                  />
 
-              {/* شاشة التسجيل */}
-              <Stack.Screen
-                name="auth/RegisterScreen"
-                options={{
-                  title: i18n.t('registerTitle') || 'تسجيل حساب جديد',
-                  headerShown: true,
-                  animation: 'slide_from_right',
-                }}
-              />
-              <Stack.Screen
-                name="/chat/[userId]/index"
-                options={{
-                  headerShown: true,
-                  animation: 'slide_from_right',
-                }}
-              />
+                  <Stack.Screen
+                    name="/group/[groupId]/index"
+                    options={{
+                      headerShown: false,
+                      animation: 'slide_from_right',
+                    }}
+                  />
+                  <Stack.Screen
+                    name="/group/[settingId]/index"
+                    options={{
+                      headerShown: false,
+                      animation: 'slide_from_right',
+                    }}
+                  />
 
-              <Stack.Screen
-                name="/group/[groupId]/index"
-                options={{
-                  headerShown: false,
-                  animation: 'slide_from_right',
-                }}
-              />
-              <Stack.Screen
-                name="/group/[settingId]/index"
-                options={{
-                  headerShown: false,
-                  animation: 'slide_from_right',
-                }}
-              />
-
-              <Stack.Screen
-                name="/SearchUserScreen"
-                options={{
-                  headerShown: true,
-                  animation: 'slide_from_right',
-                }}
-              />
-              <Stack.Screen
-                name="/FriendRequestsScreen"
-                options={{
-                  headerShown: true,
-                  animation: 'slide_from_right',
-                }}
-              />
+                  <Stack.Screen
+                    name="/SearchUserScreen"
+                    options={{
+                      headerShown: true,
+                      animation: 'slide_from_right',
+                    }}
+                  />
+                  <Stack.Screen
+                    name="/FriendRequestsScreen"
+                    options={{
+                      headerShown: true,
+                      animation: 'slide_from_right',
+                    }}
+                  />
 
 
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-            </Stack>
-          </ThemeProvider>
-        </ThemeContext.Provider>
-      </I18nextProvider>
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+                </Stack>
+              </ThemeProvider>
+            </ThemeContext.Provider>
+          </I18nextProvider>
+        </PersistGate>
+
+      </Provider>
+
     </WebSocketProvider>
 
   );

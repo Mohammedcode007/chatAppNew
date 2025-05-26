@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Alert, I18nManager } from 'react-native';
-import { connectSocket } from '@/utils/socket';
 import axios from 'axios';  // إذا لم تكن أضفته
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import i18n from 'i18next';  // تأكد من أنك مهيئ i18n في مشروعك
@@ -17,6 +16,9 @@ import {
 import AuthInput from '@/components/AuthInput';
 import { router } from 'expo-router';
 import { useThemeMode } from '@/context/ThemeContext';
+import { loginUser } from '@/services/auth';
+import { useDispatch } from 'react-redux';
+import { setError, setLoading, setUser } from '@/store/userSlice';
 
 // **افترض هنا وجود useThemeMode لإدارة الوضع الليلي**
 
@@ -29,54 +31,28 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
   const [password, setPassword] = useState('');
   const [usernameError, setUsernameError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const dispatch = useDispatch();
+
+ 
 
   const handleLogin = async () => {
-    let valid = true;
+    dispatch(setLoading(true));
+    dispatch(setError(null));
 
-    if (!username) {
-      setUsernameError('Username is required');
-      valid = false;
+    const result = await loginUser(username, password);
+
+    dispatch(setLoading(false));
+
+    if (result.success) {
+      dispatch(setUser({ userData: result.user, token: result.token }));
+      // توجه للصفحة الرئيسية بعد تسجيل الدخول
+      router.push('/(tabs)');
     } else {
-      setUsernameError('');
-    }
-
-    if (!password) {
-      setPasswordError('Password is required');
-      valid = false;
-    } else {
-      setPasswordError('');
-    }
-
-    if (!valid) return;
-
-    try {
-      const response = await axios.post('http://192.168.80.248:3000/login', {
-        username,
-        password,
-      });
-
-      if (response.status !== 200 || !response.data.token) {
-        Alert.alert('Login Failed', 'Invalid username or password.');
-        return;
-      }
-
-      const { token } = response.data;
-
-      if (token) {
-        await AsyncStorage.setItem('authToken', token);
-      await AsyncStorage.setItem('hasSeenOnboarding', 'true');
-
-        router.push('/(tabs)');
-      } else {
-        await AsyncStorage.removeItem('authToken');
-        Alert.alert('Login Failed', 'Authentication token not received from server.');
-      }
-
-    } catch (error) {
-      console.error('Login error:', error);
-      Alert.alert('Login Failed', 'Please check your credentials or server connection.');
+      dispatch(setError(result.message || 'Login failed'));
+      Alert.alert('Error', result.message || 'Login failed');
     }
   };
+
 
 
 

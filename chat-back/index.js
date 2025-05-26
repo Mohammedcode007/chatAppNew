@@ -25,6 +25,8 @@ mongoose.connect(MONGO_URI)
 app.post('/signup', authController.signup);
 app.post('/login', authController.login);
 app.post('/logout', authMiddleware, authController.logout);
+app.post('/updateUser', authMiddleware, authController.updateUser);
+
 app.get('/search', userController.searchUsers);
 app.post('/friends/requests',authMiddleware, friendsController.respondToFriendRequest);
 app.get('/friends/requests', authMiddleware, friendsController.getFriendRequests);
