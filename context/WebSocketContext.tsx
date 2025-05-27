@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
+import { WS_URL } from '@/config';
 
 type WebSocketContextType = {
   ws: React.MutableRefObject<WebSocket | null>;
@@ -26,7 +27,8 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return;
       }
 
-      ws.current = new WebSocket(`ws://192.168.80.248:3000/chat?token=${token}`);
+      // ws.current = new WebSocket(`ws://192.168.5.90:3000/chat?token=${token}`);
+      ws.current = new WebSocket(`${WS_URL}/chat?token=${token}`);
 
       ws.current.onopen = () => console.log('WebSocket connected');
       ws.current.onmessage = (event) => console.log('WS Message:', JSON.parse(event.data));

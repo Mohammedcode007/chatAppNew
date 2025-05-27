@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,7 @@ import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useThemeMode } from '@/context/ThemeContext';
 import { useUserProfile } from '@/Hooks/useUserProfile';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 const windowWidth = Dimensions.get('window').width;
 
 const user = {
@@ -51,7 +52,24 @@ const user = {
 
 export default function ProfileScreen() {
     const { darkMode, toggleDarkMode } = useThemeMode();
+  const [userdata, setUserdata] = useState<any>(null);
+console.log(userdata);
 
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const userDataString = await AsyncStorage.getItem('userData');
+        if (userDataString) {
+          const userData = JSON.parse(userDataString);
+          setUserdata(userData);
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
+    fetchUserData();
+  }, []);
   const theme = {
     bg: darkMode ? '#121212' : '#FFF',
     text: darkMode ? '#FFF' : '#000',
