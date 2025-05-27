@@ -13,6 +13,8 @@ import CustomHeader from '@/components/CustomHeader';
 import { Alert } from 'react-native';
 import axios from 'axios';
 import { router } from 'expo-router';
+import { API_URL } from '@/config';
+import { useUserStatus } from '@/Hooks/useUserStatus';
 export default function MoreScreen() {
     const { t } = useTranslation();
     const [muteNotifications, setMuteNotifications] = useState(false);
@@ -45,6 +47,7 @@ export default function MoreScreen() {
 
         setLanguageModalVisible(false);
     };
+  const { status, error, loading, updateStatus } = useUserStatus('offline');
 
     const { darkMode, toggleDarkMode } = useThemeMode();
     const isRTL = language === 'ar';
@@ -54,9 +57,10 @@ export default function MoreScreen() {
             const token = await AsyncStorage.getItem('authToken');
             if (token) {
                 console.log(token);
+          updateStatus('offline', token); // الآن token مضمون أنه string
 
                 await axios.post(
-                    'http://192.168.80.248:3000/logout',
+                    `${API_URL}/logout`,
                     {},
                     {
                         headers: { Authorization: `Bearer ${token}` },

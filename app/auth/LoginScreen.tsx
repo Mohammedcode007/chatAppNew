@@ -19,6 +19,7 @@ import { useThemeMode } from '@/context/ThemeContext';
 import { loginUser } from '@/services/auth';
 import { useDispatch } from 'react-redux';
 import { setError, setLoading, setUser } from '@/store/userSlice';
+import { useUserStatus } from '@/Hooks/useUserStatus';
 
 // **افترض هنا وجود useThemeMode لإدارة الوضع الليلي**
 
@@ -32,8 +33,9 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
   const [usernameError, setUsernameError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const dispatch = useDispatch();
+  const { status, error, loading, updateStatus } = useUserStatus('offline');
 
- 
+
 
   const handleLogin = async () => {
     dispatch(setLoading(true));
@@ -45,6 +47,8 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
 
     if (result.success) {
       dispatch(setUser({ userData: result.user, token: result.token }));
+      updateStatus('online', result.token); // الآن token مضمون أنه string
+
       // توجه للصفحة الرئيسية بعد تسجيل الدخول
       router.push('/(tabs)');
     } else {

@@ -26,6 +26,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useThemeMode } from '@/context/ThemeContext';
 import { useUserProfile } from '@/Hooks/useUserProfile';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useUserStatus } from '@/Hooks/useUserStatus';
 const windowWidth = Dimensions.get('window').width;
 
 const user = {
@@ -51,9 +52,8 @@ const user = {
 };
 
 export default function ProfileScreen() {
-    const { darkMode, toggleDarkMode } = useThemeMode();
-  const [userdata, setUserdata] = useState<any>(null);
-console.log(userdata);
+  const { darkMode, toggleDarkMode } = useThemeMode();
+  const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -61,7 +61,7 @@ console.log(userdata);
         const userDataString = await AsyncStorage.getItem('userData');
         if (userDataString) {
           const userData = JSON.parse(userDataString);
-          setUserdata(userData);
+          setUserData(userData);
         }
       } catch (error) {
         console.error('Error fetching user data:', error);
@@ -78,17 +78,15 @@ console.log(userdata);
     border: darkMode ? '#333' : '#DDD',
   };
 
-  const [userData, setUserData] = useState(user);
   const [modalVisible, setModalVisible] = useState(false);
   const [currentEditKey, setCurrentEditKey] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState('');
   const [dateValue, setDateValue] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const { profile, updateProfile, notifications } = useUserProfile();
+  console.log(userData);
 
-  const handleUsernameChange = () => {
-    updateProfile({ username: '4اسم جديد' });
-  };
+
   // فتح المودال مع تهيئة البيانات حسب نوع الحقل
   const openEditModal = (key: string, currentValue: string) => {
     setCurrentEditKey(key);
@@ -113,6 +111,26 @@ console.log(userdata);
 
     setModalVisible(true);
   };
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchToken = async () => {
+      try {
+        const storedToken = await AsyncStorage.getItem('authToken');
+        if (storedToken) {
+          setToken(storedToken);
+        }
+      } catch (error) {
+        console.error('فشل في جلب التوكن:', error);
+      }
+    };
+
+    fetchToken();
+  }, []);
+
+
+  const { status, error, loading, updateStatus } = useUserStatus('offline');
+
 
   const handleSave = () => {
     if (!currentEditKey) return;
@@ -123,22 +141,37 @@ console.log(userdata);
       const d = dateValue.getDate().toString().padStart(2, '0');
       const formattedDate = `${y}-${m}-${d}`;
 
-      setUserData((prev) => ({
-        ...prev,
-        [currentEditKey]: formattedDate,
-      }));
+      setUserData((prev: any) => {
+        const updated = { ...prev, [currentEditKey]: formattedDate };
+        return updated;
+      });
+
     } else {
       if (inputValue.trim() === '') {
         Alert.alert('خطأ', 'القيمة لا يمكن أن تكون فارغة');
         return;
       }
-      setUserData((prev) => ({
-        ...prev,
-        [currentEditKey]: inputValue,
-      }));
+      setUserData((prev: any) => {
+        const updated = { ...prev, [currentEditKey]: inputValue };
+        // هنا نطبع الحالة لو كان currentEditKey = 'status'
+        if (currentEditKey === 'status') {
+          if (!token) {
+            Alert.alert('خطأ', 'التوكن غير موجود، يرجى تسجيل الدخول مجددًا');
+            return;
+          }
+
+          updateStatus(updated.status, token); // الآن token مضمون أنه string
+          console.log('الحالة الجديدة:', updated.status);
+        }
+
+        return updated;
+      });
     }
+
     setModalVisible(false);
   };
+
+
 
   const onChangeDate = (event: any, selectedDate?: Date) => {
     setShowDatePicker(Platform.OS === 'ios');
@@ -152,7 +185,7 @@ console.log(userdata);
     Alert.alert('Copied', 'تم نسخ القيمة إلى الحافظة');
   };
 
-   // دالة اختيار صورة من المعرض وتحديثها حسب نوع الصورة (avatar أو cover)
+  // دالة اختيار صورة من المعرض وتحديثها حسب نوع الصورة (avatar أو cover)
   const pickImage = async (type: 'avatar' | 'cover') => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -162,17 +195,17 @@ console.log(userdata);
         quality: 1,
       });
 
-  if (!result.canceled && result.assets && result.assets.length > 0) {
-    const uri = result.assets[0].uri;
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const uri = result.assets[0].uri;
         if (!uri) return;
 
         if (type === 'avatar') {
-          setUserData((prev) => ({
+          setUserData((prev: any) => ({
             ...prev,
             avatar: uri,
           }));
         } else if (type === 'cover') {
-          setUserData((prev) => ({
+          setUserData((prev: any) => ({
             ...prev,
             cover: uri,
           }));
@@ -183,7 +216,7 @@ console.log(userdata);
     }
   };
 
- const editAvatar = () => {
+  const editAvatar = () => {
     pickImage('avatar');
   };
 
@@ -191,12 +224,20 @@ console.log(userdata);
     pickImage('cover');
   };
 
+  if (!userData) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
+        <Text style={{ color: theme.text, textAlign: 'center', marginTop: 50 }}>جاري تحميل البيانات...</Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
       <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={{ position: 'relative' }}>
-          <Image source={{ uri: userData.cover }} style={styles.coverImage} />
+          <Image source={{ uri: userData.cover || "https://i.pinimg.com/736x/17/1a/6c/171a6c7b6bce25e1664c0d7315251e46.jpg" }} style={styles.coverImage} />
           {/* زر تعديل صورة الكوفر */}
           <TouchableOpacity
             style={styles.editCoverButton}
@@ -218,7 +259,7 @@ console.log(userdata);
 
         <View style={styles.profileSection}>
           <View style={{ position: 'relative' }}>
-            <Image source={{ uri: userData.avatar }} style={styles.avatar} />
+            <Image source={{ uri: userData.avatar || "https://i.pravatar.cc/150?img=12" }} style={styles.avatar} />
             {/* زر تعديل صورة الأفاتار */}
             <TouchableOpacity
               style={styles.editAvatarButton}
@@ -228,12 +269,25 @@ console.log(userdata);
               <Ionicons name="create-outline" size={20} color="#FFF" />
             </TouchableOpacity>
           </View>
-          <Text style={[styles.name, { color: theme.text }]}>
-            {userData.name}{' '}
-            {userData.verified && (
-              <Ionicons name="checkmark-circle" size={18} color="#007bff" />
-            )}
-          </Text>
+          <TouchableOpacity onPress={() => openEditModal('username', userData.username)}>
+            <Text style={[styles.name, { color: theme.text }]}>
+              {userData.username}{' '}
+              {userData.verified && (
+                <Ionicons name="checkmark-circle" size={18} color="#007bff" />
+              )}
+              <Ionicons name="create-outline" size={16} color={theme.text} />
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => openEditModal('status', userData.status || '')}
+            style={{ marginTop: 5 }}
+          >
+            <Text style={[{ color: theme.subText, fontStyle: 'italic' }]}>
+              {userData.status || 'لا توجد حالة حالية'}
+              <Ionicons name="create-outline" size={14} color={theme.subText} />
+            </Text>
+          </TouchableOpacity>
+
 
           <View style={styles.statsRow}>
             <Stat label="Posts" value={userData.posts} theme={theme} />
@@ -366,7 +420,7 @@ console.log(userdata);
                   <Text>إلغاء</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={handleUsernameChange}
+                  onPress={handleSave}
                   style={[styles.modalButton, { backgroundColor: '#4CAF50' }]}
                 >
                   <Text style={{ color: '#fff' }}>حفظ</Text>
@@ -411,7 +465,7 @@ const InfoItem = ({
   onEdit: () => void;
 }) => (
   <View style={styles.infoItem}>
-<Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={22} color={theme.text} />
+    <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={22} color={theme.text} />
     <Text style={[styles.infoLabel, { color: theme.text }]}>{label}:</Text>
     <Text style={[styles.infoValue, { color: theme.subText }]}>{value}</Text>
 

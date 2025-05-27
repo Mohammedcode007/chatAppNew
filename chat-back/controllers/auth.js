@@ -3,17 +3,36 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../config');
 exports.signup = async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, email } = req.body;  // استقبال البريد مع باقي البيانات
   try {
+    // التحقق إذا كان اسم المستخدم موجود مسبقاً
     const existing = await User.findOne({ username });
     if (existing) return res.status(400).json({ message: 'Username already exists' });
 
+    // يمكنك إضافة تحقق اختياري من البريد إذا أردت
+    // const existingEmail = await User.findOne({ email });
+    // if (existingEmail) return res.status(400).json({ message: 'Email already exists' });
+
+    // تشفير كلمة المرور
     const hashed = await bcrypt.hash(password, 10);
-    const user = new User({ username, password: hashed, status: 'offline', friends: [] });
+
+    // إنشاء كائن المستخدم مع البريد المرسل
+    const user = new User({
+      username,
+      password: hashed,
+      email: email || '',      // إذا لم يُرسل البريد، نضع قيمة فارغة أو null حسب تعريف السكيما
+      status: 'offline',
+      friends: [],
+    });
+
+    // حفظ المستخدم في قاعدة البيانات
     await user.save();
+
+    // إرسال رد بنجاح التسجيل
     res.json({ message: 'User registered successfully' });
+
   } catch (err) {
-    console.error('Signup error:', err);  // <-- هنا طباعة الخطأ المفصل
+    console.error('Signup error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -33,10 +52,12 @@ exports.login = async (req, res) => {
     user.status = 'online';
     await user.save();
 
-    const token = jwt.sign(
-      { id: user._id, username: user.username },
-      JWT_SECRET
-    );
+   const token = jwt.sign(
+  { id: user._id, username: user.username },
+  JWT_SECRET,
+  { expiresIn: '30d' } // مدة الصلاحية: 30 يوم
+);
+
 
     const userObj = user.toObject();
     delete userObj.password;

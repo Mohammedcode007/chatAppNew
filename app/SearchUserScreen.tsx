@@ -12,6 +12,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { useWebSocket } from '@/context/WebSocketContext'; // تأكد من المسار الصحيح حسب مشروعك
+import { API_URL } from '@/config';
 
 interface User {
   _id: string;
@@ -37,7 +38,7 @@ const SearchUserScreen: React.FC = () => {
       }
 
       const response = await axios.get<User[]>(
-        `http://192.168.80.248:3000/search?query=${query}`,
+        `${API_URL}/search?query=${query}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

@@ -6,6 +6,8 @@ import { useSelector } from 'react-redux';
 import { RootState } from '@/store';
 import CustomHeader from '@/components/CustomHeader';
 import { useThemeMode } from '@/context/ThemeContext';
+import { useFriendStatuses } from '@/Hooks/useFriendStatuses';
+import { useRouter } from 'expo-router';
 
 type Friend = {
   _id: string;
@@ -20,34 +22,54 @@ const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 export default function Friends() {
   const { darkMode } = useThemeMode();
   const user = useSelector((state: RootState) => state.user);
-  console.log(user);
-  
+  const { friendStatuses } = useFriendStatuses();
+
+  console.log(user, 'user');
+  console.log(friendStatuses, "friendStatuses");
+
   const [friends, setFriends] = useState<Friend[]>([]);
   const [searchText, setSearchText] = useState('');
   const flatListRef = useRef<FlatList>(null);
+  const router = useRouter();
 
   const language = 'ar';
   const isRTL = language === 'ar';
-
   useEffect(() => {
     if (user && user.userData && user.userData.friends) {
-      // تحويل بيانات الأصدقاء من الـ Redux إلى الصيغة المطلوبة، وترتيب أبجدي
       const friendsList = user.userData.friends.map((f: any) => ({
         _id: f._id,
         username: f.username,
         status: f.status || '',
-        avatar: `https://randomuser.me/api/portraits/men/${Math.floor(Math.random() * 100)}.jpg`, // مثال صورة عشوائية مؤقتة
-        isOnline: f.status === 'online',
+        avatar: `https://randomuser.me/api/portraits/men/${Math.floor(Math.random() * 100)}.jpg`,
+        isOnline: friendStatuses[f._id] === 'online',
       }));
 
       const sortedFriends = friendsList.sort((a, b) => a.username.localeCompare(b.username));
       setFriends(sortedFriends);
     }
-  }, [user]);
+  }, [user, friendStatuses]); // لاحظ إضافة friendStatuses هنا
+
+  // useEffect(() => {
+  //   if (user && user.userData && user.userData.friends) {
+  //     // تحويل بيانات الأصدقاء من الـ Redux إلى الصيغة المطلوبة، وترتيب أبجدي
+  //     const friendsList = user.userData.friends.map((f: any) => ({
+  //       _id: f._id,
+  //       username: f.username,
+  //       status: f.status || '',
+  //       avatar: `https://randomuser.me/api/portraits/men/${Math.floor(Math.random() * 100)}.jpg`, // مثال صورة عشوائية مؤقتة
+  //       isOnline: f.status === 'online',
+  //     }));
+
+  //     const sortedFriends = friendsList.sort((a, b) => a.username.localeCompare(b.username));
+  //     setFriends(sortedFriends);
+  //   }
+  // }, [user]);
 
   const filteredFriends = friends.filter(friend =>
     friend.username.toLowerCase().includes(searchText.toLowerCase())
   );
+  console.log(filteredFriends, '787987987');
+
 
   const scrollToLetter = (letter: string) => {
     const index = filteredFriends.findIndex(friend => friend.username[0].toUpperCase() === letter);
@@ -66,7 +88,9 @@ export default function Friends() {
   };
 
   const renderFriend = ({ item }: { item: Friend }) => (
-    <View style={[styles.friendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+    <TouchableOpacity style={[styles.friendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+      onPress={() => router.push(`/chat/${item._id}?name=${encodeURIComponent(item.username)}`)}
+    >
       <View style={styles.avatarContainer}>
         <Image source={{ uri: item.avatar }} style={styles.avatar} />
         <View
@@ -89,7 +113,7 @@ export default function Friends() {
         <Text style={[styles.friendName, { color: darkMode ? '#fff' : '#000' }]}>{item.username}</Text>
         <Text style={[styles.statusMessage, { color: darkMode ? '#aaa' : '#666' }]}>{item.status}</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   if (user.loading) {
