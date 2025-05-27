@@ -141,6 +141,8 @@ export default function MoreScreen() {
                     icon="shield-checkmark-outline"
                     title={t('Security')}
                     direction={isRTL ? 'left' : 'right'}
+                        onPress={() => router.push('/Security/SecurityScreen')}
+
                 />
                 <MoreItem
                     textColor={darkMode ? Colors.dark.text : Colors.light.text}

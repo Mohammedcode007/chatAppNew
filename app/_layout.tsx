@@ -123,6 +123,14 @@ export default function RootLayout() {
                       animation: 'slide_from_right',
                     }}
                   />
+                      <Stack.Screen
+                    name="auth/AuthGate"
+                    options={{
+                      title: i18n.t('registerTitle') || 'تسجيل حساب جديد',
+                      headerShown: true,
+                      animation: 'slide_from_right',
+                    }}
+                  />
                   <Stack.Screen
                     name="/chat/[userId]/index"
                     options={{
@@ -148,6 +156,13 @@ export default function RootLayout() {
 
                   <Stack.Screen
                     name="/SearchUserScreen"
+                    options={{
+                      headerShown: true,
+                      animation: 'slide_from_right',
+                    }}
+                  />
+                      <Stack.Screen
+                    name="/Security/SecurityScreen"
                     options={{
                       headerShown: true,
                       animation: 'slide_from_right',
