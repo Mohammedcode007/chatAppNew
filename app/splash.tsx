@@ -9,7 +9,6 @@ export default function SplashScreen() {
     const checkOnboarding = async () => {
       try {
         const seen = await AsyncStorage.getItem('hasSeenOnboarding');
-        console.log('hasSeenOnboarding:', seen);
 
         setTimeout(() => {
           if (seen === 'true') {

@@ -24,7 +24,6 @@ export default function Friends() {
   const user = useSelector((state: RootState) => state.user);
   const { friendStatuses } = useFriendStatuses();
 
-  console.log(user, 'user');
   console.log(friendStatuses, "friendStatuses");
 
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -96,7 +95,7 @@ export default function Friends() {
         <View
           style={[
             styles.onlineIndicator,
-            { backgroundColor: item.isOnline ? 'green' : 'gray' },
+            { backgroundColor: item.isOnline || item.status ===  "online"? 'green' : 'gray' },
           ]}
         />
       </View>

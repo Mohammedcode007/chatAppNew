@@ -47,7 +47,7 @@ export default function MoreScreen() {
 
         setLanguageModalVisible(false);
     };
-  const { status, error, loading, updateStatus } = useUserStatus('offline');
+    const { status, error, loading, updateStatus } = useUserStatus('offline');
 
     const { darkMode, toggleDarkMode } = useThemeMode();
     const isRTL = language === 'ar';
@@ -57,7 +57,7 @@ export default function MoreScreen() {
             const token = await AsyncStorage.getItem('authToken');
             if (token) {
                 console.log(token);
-          updateStatus('offline', token); // الآن token مضمون أنه string
+                updateStatus('offline', token); // الآن token مضمون أنه string
 
                 await axios.post(
                     `${API_URL}/logout`,
@@ -145,7 +145,7 @@ export default function MoreScreen() {
                     icon="shield-checkmark-outline"
                     title={t('Security')}
                     direction={isRTL ? 'left' : 'right'}
-                        onPress={() => router.push('/Security/SecurityScreen')}
+                    onPress={() => router.push('/Security/SecurityScreen')}
 
                 />
                 <MoreItem

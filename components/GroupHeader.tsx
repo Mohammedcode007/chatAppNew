@@ -17,11 +17,9 @@ export default function GroupHeader({ title, membersCount, settingId }: Props) {
   const navigation = useNavigation();
   const [menuVisible, setMenuVisible] = useState(false);
   const router = useRouter();
-console.log('Navigating to group setting:', settingId);
 
   const handleOptionPress = (option: string) => {
     setMenuVisible(false);
-    console.log(`Selected option: ${option}`);
     switch (option) {
       case 'leave':
         // تنفيذ مغادرة المجموعة

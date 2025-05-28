@@ -293,38 +293,109 @@ async function handleMessage(message, ws, userSockets) {
       break;
     }
 
+// case 'private_message': {
+//   const { toUserId, text, tempId } = msg;
+//   console.log(`[private_message] Received message from ${ws.userId} to ${toUserId}: ${text}`);
+
+//   // التحقق من وجود المستخدم المستقبل
+//   const receiver = await User.findById(toUserId);
+//   if (!receiver) {
+//     console.log(`[private_message] Receiver with ID ${toUserId} not found.`);
+//     return;
+//   }
+//   console.log(`[private_message] Receiver found: ${receiver.username}`);
+
+//   // التحقق من الحظر المتبادل
+//   if (receiver.blockedUsers?.includes(ws.userId) || ws.blockedUsers?.includes(toUserId)) {
+//     console.log(`[private_message] Message blocked: sender ${ws.userId} or receiver ${toUserId} has blocked the other.`);
+//     return sendToUser(userSockets, ws.userId, {
+//       type: 'message_failed',
+//       reason: 'تم الحظر من أحد الطرفين'
+//     });
+//   }
+
+//   // إنشاء الرسالة في قاعدة البيانات
+//   const newMessage = await Message.create({
+//     sender: ws.userId,
+//     receiver: toUserId,
+//     text,
+//     status: userSockets[toUserId] ? 'delivered' : 'sent',
+//     isBlocked: false
+//   });
+//   console.log(`[private_message] Message saved with ID ${newMessage._id} and status ${newMessage.status}`);
+
+//   // إرسال الرسالة إلى المستقبل إذا كان متصلاً
+//   if (userSockets[toUserId]) {
+//     sendToUser(userSockets, toUserId, {
+//       type: 'new_private_message',
+//       message: {
+//         _id: newMessage._id,
+//         sender: ws.userId,
+//         receiver: toUserId,
+//         text: newMessage.text,
+//         timestamp: newMessage.timestamp,
+//         status: newMessage.status
+//       }
+//     });
+//     console.log(`[private_message] Message sent to receiver ${toUserId}`);
+//   } else {
+//     console.log(`[private_message] Receiver ${toUserId} is offline, message status set to 'sent'`);
+//   }
+
+//   // تأكيد الإرسال للمرسل مع إعادة tempId
+//   sendToUser(userSockets, ws.userId, {
+//     type: 'message_sent_confirmation',
+//     tempId,
+//     messageId: newMessage._id,
+//     status: newMessage.status
+//   });
+//   console.log(`[private_message] Confirmation sent to sender ${ws.userId}`);
+
+//   // طباعة المحادثة الحالية بين الطرفين بعد إرسال الرسالة
+//   const conversation = await Message.find({
+//     $or: [
+//       { sender: ws.userId, receiver: toUserId },
+//       { sender: toUserId, receiver: ws.userId }
+//     ]
+//   }).sort({ timestamp: 1 });
+
+//   console.log(`[private_message] Conversation between ${ws.userId} and ${toUserId}:`);
+//   conversation.forEach(msg => {
+//     const senderLabel = msg.sender.toString() === ws.userId ? 'Me' : receiver.username;
+//     console.log(`  [${msg.timestamp.toISOString()}] ${senderLabel}: ${msg.text}`);
+//   });
+
+//   break;
+// }
 case 'private_message': {
   const { toUserId, text, tempId } = msg;
   console.log(`[private_message] Received message from ${ws.userId} to ${toUserId}: ${text}`);
 
-  // التحقق من وجود المستخدم المستقبل
   const receiver = await User.findById(toUserId);
   if (!receiver) {
     console.log(`[private_message] Receiver with ID ${toUserId} not found.`);
     return;
   }
-  console.log(`[private_message] Receiver found: ${receiver.username}`);
 
-  // التحقق من الحظر المتبادل
   if (receiver.blockedUsers?.includes(ws.userId) || ws.blockedUsers?.includes(toUserId)) {
-    console.log(`[private_message] Message blocked: sender ${ws.userId} or receiver ${toUserId} has blocked the other.`);
     return sendToUser(userSockets, ws.userId, {
       type: 'message_failed',
       reason: 'تم الحظر من أحد الطرفين'
     });
   }
 
-  // إنشاء الرسالة في قاعدة البيانات
   const newMessage = await Message.create({
     sender: ws.userId,
     receiver: toUserId,
     text,
-    status: userSockets[toUserId] ? 'delivered' : 'sent',
-    isBlocked: false
+    status: 'sent',
+    isBlocked: false,
+    timestamp: new Date()
   });
-  console.log(`[private_message] Message saved with ID ${newMessage._id} and status ${newMessage.status}`);
 
-  // إرسال الرسالة إلى المستقبل إذا كان متصلاً
+  console.log('New message created:', newMessage);
+
+  // إرسال الرسالة للطرف المستقبل فوراً مع تحديث الحالة
   if (userSockets[toUserId]) {
     sendToUser(userSockets, toUserId, {
       type: 'new_private_message',
@@ -334,39 +405,32 @@ case 'private_message': {
         receiver: toUserId,
         text: newMessage.text,
         timestamp: newMessage.timestamp,
-        status: newMessage.status
+        status: 'delivered'
       }
     });
-    console.log(`[private_message] Message sent to receiver ${toUserId}`);
-  } else {
-    console.log(`[private_message] Receiver ${toUserId} is offline, message status set to 'sent'`);
+
+    // تحديث حالة الرسالة في DB إلى delivered
+    await Message.findByIdAndUpdate(newMessage._id, { status: 'delivered' });
   }
 
-  // تأكيد الإرسال للمرسل مع إعادة tempId
+  // تأكيد الإرسال للطرف المرسل مع الحالة
   sendToUser(userSockets, ws.userId, {
     type: 'message_sent_confirmation',
     tempId,
-    messageId: newMessage._id,
-    status: newMessage.status
-  });
-  console.log(`[private_message] Confirmation sent to sender ${ws.userId}`);
-
-  // طباعة المحادثة الحالية بين الطرفين بعد إرسال الرسالة
-  const conversation = await Message.find({
-    $or: [
-      { sender: ws.userId, receiver: toUserId },
-      { sender: toUserId, receiver: ws.userId }
-    ]
-  }).sort({ timestamp: 1 });
-
-  console.log(`[private_message] Conversation between ${ws.userId} and ${toUserId}:`);
-  conversation.forEach(msg => {
-    const senderLabel = msg.sender.toString() === ws.userId ? 'Me' : receiver.username;
-    console.log(`  [${msg.timestamp.toISOString()}] ${senderLabel}: ${msg.text}`);
+    message: {
+      _id: newMessage._id,
+      sender: ws.userId,
+      receiver: toUserId,
+      text: newMessage.text,
+      timestamp: newMessage.timestamp,
+      status: userSockets[toUserId] ? 'delivered' : 'sent'
+    }
   });
 
   break;
 }
+
+
 
 case 'update_message_status': {
   const { messageId, status } = msg;
@@ -374,24 +438,38 @@ case 'update_message_status': {
 
   if (!validStatuses.includes(status)) return;
 
+  // جلب الرسالة من قاعدة البيانات
   const messageDoc = await Message.findById(messageId);
   if (!messageDoc) return;
 
-  // تحقق أن المستقبل هو المستخدم الحالي
+  // تحقق من أن المستخدم الحالي هو المستلم للرسالة
   if (messageDoc.receiver.toString() !== ws.userId) return;
 
-  messageDoc.status = status;
-  await messageDoc.save();
+  // تحديث حالة الرسالة إذا كانت الحالة الجديدة أعلى ترتيبًا من الحالة السابقة
+  // ترتيب الحالات: sent < delivered < received < seen
+  const statusOrder = {
+    sent: 0,
+    delivered: 1,
+    received: 2,
+    seen: 3
+  };
 
-  // إرسال تحديث الحالة للطرف الآخر (المرسل)
-  sendToUser(userSockets, messageDoc.sender.toString(), {
-    type: 'message_status_updated',
-    messageId: messageDoc._id,
-    status: messageDoc.status
-  });
+  if (statusOrder[status] > statusOrder[messageDoc.status]) {
+    messageDoc.status = status;
+    await messageDoc.save();
 
+    // إرسال التحديث للمرسل
+    sendToUser(userSockets, messageDoc.sender.toString(), {
+      type: 'message_status_updated',
+      messageId: messageDoc._id,
+      status: messageDoc.status,
+      receiverId: ws.userId
+    });
+  }
   break;
 }
+
+
 
 case 'get_conversation': {
   const { withUserId } = msg;
@@ -420,6 +498,36 @@ case 'get_conversation': {
   break;
 }
 
+case 'mark_as_read': {
+  const { messageId } = msg;
+
+  const message = await Message.findById(messageId);
+  if (!message) {
+    return;
+  }
+
+  // تأكد أن المستخدم الحالي هو المستقبل
+  if (message.receiver.toString() !== ws.userId) {
+    return;
+  }
+
+  // إذا كانت الحالة أقل من "read"، حدّثها
+  if (message.status !== 'read') {
+    message.status = 'read';
+    await message.save();
+
+    // أرسل للطرف الآخر أن الرسالة قُرئت
+    const senderId = message.sender.toString();
+    if (userSockets[senderId]) {
+      sendToUser(userSockets, senderId, {
+        type: 'message_read',
+        messageId: message._id
+      });
+    }
+  }
+
+  break;
+}
 
 
 

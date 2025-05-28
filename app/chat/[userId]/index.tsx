@@ -293,6 +293,7 @@
 //   input: { flex: 1, fontSize: 16, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 20 },
 //   iconButton: { marginHorizontal: 6 },
 // });
+
 import React, { useEffect, useRef, useState } from "react";
 import {
   Text,
@@ -303,12 +304,15 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  SafeAreaView,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useThemeMode } from "@/context/ThemeContext";
 import { useConversation } from "@/Hooks/useConversation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keyboard, KeyboardEvent } from "react-native";
 
 interface Message {
   _id: string;
@@ -330,6 +334,7 @@ export default function ChatScreen() {
     setNewMessage,
     sendMessage,
   } = useConversation(userId);
+console.log(messages,'messages787');
 
   const [userData, setUserData] = useState<any>(null);
   const flatListRef = useRef<FlatList<Message> | null>(null);
@@ -364,7 +369,6 @@ export default function ChatScreen() {
     scrollToEnd();
   };
 
-  // دالة لتحويل الوقت إلى صيغة بسيطة (مثلاً 14:35)
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
     const hours = date.getHours();
@@ -393,8 +397,8 @@ export default function ChatScreen() {
                   ? "#0B93F6"
                   : "#007AFF"
                 : darkMode
-                ? "#3A3A3C"
-                : "#E5E5EA",
+                  ? "#3A3A3C"
+                  : "#E5E5EA",
               borderBottomRightRadius: isMyMessage ? 0 : 20,
               borderBottomLeftRadius: isMyMessage ? 20 : 0,
             },
@@ -421,49 +425,78 @@ export default function ChatScreen() {
     );
   };
 
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+
+useEffect(() => {
+  const showSubscription = Keyboard.addListener("keyboardDidShow", (e: KeyboardEvent) => {
+    setKeyboardHeight(e.endCoordinates.height);
+  });
+  const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+    setKeyboardHeight(0);
+  });
+
+  return () => {
+    showSubscription.remove();
+    hideSubscription.remove();
+  };
+}, []);
+
+const MAX_KEYBOARD_HEIGHT = 90;
+
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={[styles.container, { backgroundColor: darkMode ? "#000" : "#fff" }]}
-    >
-      <FlatList<Message>
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(item) => item._id}
-        renderItem={renderItem}
-        contentContainerStyle={styles.flatListContent}
-        onContentSizeChange={scrollToEnd}
-        onLayout={scrollToEnd}
-      />
-      <View
-        style={[
-          styles.inputContainer,
-          { backgroundColor: darkMode ? "#121212" : "#f2f2f2" },
-        ]}
+    <SafeAreaView style={{ flex: 1, backgroundColor: darkMode ? "#000" : "#fff" }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0} // بدل 100 إلى 0
+        style={{ flex: 1 }}
       >
-        <TextInput
-          style={[styles.input, { color: darkMode ? "#fff" : "#000" }]}
-          placeholder="اكتب رسالة..."
-          placeholderTextColor={darkMode ? "#888" : "#999"}
-          value={newMessage}
-          onChangeText={setNewMessage}
-          multiline
-        />
-        <TouchableOpacity onPress={sendTextMessage} style={styles.iconButton}>
-          <Ionicons name="send" size={24} color={darkMode ? "#fff" : "#000"} />
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View style={{ flex: 1, paddingBottom: Math.min(keyboardHeight, MAX_KEYBOARD_HEIGHT) }}>
+            <FlatList<Message>
+              ref={flatListRef}
+              data={messages}
+                extraData={messages}   // هذا يضمن إعادة التحديث عند تغير messages
+
+              keyExtractor={(item) => item._id}
+              renderItem={renderItem}
+              contentContainerStyle={styles.flatListContent}
+              onContentSizeChange={scrollToEnd}
+              onLayout={scrollToEnd}
+              keyboardShouldPersistTaps="handled"
+            />
+
+            <View
+              style={[
+                styles.inputContainer,
+                { backgroundColor: darkMode ? "#121212" : "#f2f2f2" },
+              ]}
+            >
+              <TextInput
+                style={[styles.input, { color: darkMode ? "#fff" : "#000" }]}
+                placeholder="اكتب رسالة..."
+                placeholderTextColor={darkMode ? "#888" : "#999"}
+                value={newMessage}
+                onChangeText={setNewMessage}
+                multiline
+              />
+              <TouchableOpacity onPress={sendTextMessage} style={styles.iconButton}>
+                <Ionicons name="send" size={24} color={darkMode ? "#fff" : "#000"} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+
+
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   flatListContent: {
     padding: 12,
-    paddingBottom: 70,
+    paddingBottom: 20,
   },
   messageContainer: {
     flexDirection: "row",
@@ -495,20 +528,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
     borderTopWidth: 1,
     borderColor: "#ccc",
   },
   input: {
     flex: 1,
-    maxHeight: 100,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 16,
   },
+
   iconButton: {
     paddingLeft: 12,
   },

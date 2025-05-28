@@ -3,6 +3,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 interface UserState {
+  friends(friends: any, arg1: string): unknown;
   userData: {
     _id?: string;
     username?: string;
@@ -22,6 +23,9 @@ const initialState: UserState = {
   token: null,
   loading: false,
   error: null,
+  friends: function (friends: any, arg1: string): unknown {
+    throw new Error('Function not implemented.');
+  }
 };
 
 const userSlice = createSlice({

@@ -161,7 +161,6 @@ export default function ProfileScreen() {
           }
 
           updateStatus(updated.status, token); // الآن token مضمون أنه string
-          console.log('الحالة الجديدة:', updated.status);
         }
 
         return updated;
