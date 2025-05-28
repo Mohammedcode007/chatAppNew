@@ -21,7 +21,7 @@ export function useConversation(withUserId: string) {
     const handleMessage = (event: MessageEvent) => {
       try {
         const data = JSON.parse(event.data);
-    console.log("Received data:", data);
+        console.log("Received data:", data);
 
         // استلام سجل المحادثة بدون شرط withUserId لأنه غير موجود في الرد من السيرفر
         if (data.type === "conversation_history") {
@@ -69,20 +69,21 @@ export function useConversation(withUserId: string) {
 
         // تحديث معرف الرسالة المؤقت بمعرف الرسالة الحقيقي عند تأكيد الإرسال
         if (data.type === "message_sent_confirmation" && data.messageId) {
-  setMessages((prev) => {
-    const index = prev.findIndex((m) => m._id === data.tempId); // البحث عبر tempId وليس _id.startsWith("temp-")
-    if (index !== -1) {
-      const updated = [...prev];
-      updated[index] = {
-        ...updated[index],
-        _id: data.messageId,
-        status: data.status || updated[index].status,
-      };
-      return updated;
-    }
-    return prev;
-  });
-}
+          setMessages((prev) => {
+            const index = prev.findIndex((m) => m._id === data.tempId); // البحث عبر tempId وليس _id.startsWith("temp-")
+            if (index !== -1) {
+              const updated = [...prev];
+              updated[index] = {
+                ...updated[index],
+                _id: data.messageId,
+                status: data.status || updated[index].status,
+              };
+              return updated;
+            }
+            return prev;
+          });
+        }
+
 
       } catch (err) {
         console.error("WebSocket message error:", err);
@@ -90,7 +91,8 @@ export function useConversation(withUserId: string) {
     };
 
     ws.current.addEventListener("message", handleMessage);
-
+    openConversation();
+openChat()
     // طلب سجل المحادثة مع النوع الصحيح من السيرفر
     ws.current.send(
       JSON.stringify({
@@ -147,11 +149,48 @@ export function useConversation(withUserId: string) {
     );
   };
 
+  // دالة فتح المحادثة وجلب الرسائل وتحديث حالتها إلى seen
+  const openConversation = () => {
+    if (!ws.current || !withUserId) return;
+
+    ws.current.send(
+      JSON.stringify({
+        type: "open_private_chat",
+        withUserId,
+      })
+    );
+  };
+
+    const openChat = () => {
+    if (!ws.current || !withUserId) return;
+
+    ws.current.send(
+      JSON.stringify({
+        type: "open_chat",
+        withUserId,
+      })
+    );
+  };
+
+      const closeChat = () => {
+    if (!ws.current || !withUserId) return;
+
+    ws.current.send(
+      JSON.stringify({
+        type: "close_chat",
+        withUserId,
+      })
+    );
+  };
+
+
   return {
     messages,
     newMessage,
     setNewMessage,
     sendMessage,
     updateMessageStatus,
+    openChat,
+    closeChat
   };
 }

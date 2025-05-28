@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from "react";
 import {
   Text,
@@ -11,13 +10,15 @@ import {
   View,
   SafeAreaView,
   TouchableWithoutFeedback,
+  Keyboard,
+  KeyboardEvent,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useThemeMode } from "@/context/ThemeContext";
 import { useConversation } from "@/Hooks/useConversation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Keyboard, KeyboardEvent } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface Message {
   _id: string;
@@ -32,17 +33,28 @@ export default function ChatScreen() {
   const { userId, name } = useLocalSearchParams<{ userId: string; name?: string }>();
   const { darkMode } = useThemeMode();
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
 
   const {
     messages,
     newMessage,
     setNewMessage,
     sendMessage,
+    openChat,
+    closeChat
   } = useConversation(userId);
-console.log(messages,'messages787');
 
   const [userData, setUserData] = useState<any>(null);
   const flatListRef = useRef<FlatList<Message> | null>(null);
+  useEffect(() => {
+  openChat();
+  console.log("ChatScreen mounted - openChat called");
+
+  return () => {
+    closeChat();
+    console.log("ChatScreen unmounted - closeChat called, user left chat");
+  };
+}, []);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -84,119 +96,108 @@ console.log(messages,'messages787');
     return `${h}:${m} ${ampm}`;
   };
 
+  const renderItem = ({ item }: { item: Message }) => {
+    const isMyMessage = item.sender === userData?._id;
 
-// داخل renderItem، نضيف أيقونة حالة الرسالة فقط للرسائل التي أرسلها المستخدم:
-const renderItem = ({ item }: { item: Message }) => {
-  const isMyMessage = item.sender === userData?._id;
+    const getStatusIcon = (status: Message["status"]) => {
+      switch (status) {
+        case "sent":
+          return <Ionicons name="checkmark-outline" size={14} color="#ccc" />;
+        case "delivered":
+          return <Ionicons name="checkmark-done-outline" size={14} color="#4caf50" />;
+        case "received":
+          return <Ionicons name="arrow-down-circle-outline" size={14} color="#2196f3" />;
+        case "seen":
+          return <Ionicons name="eye-outline" size={14} color="#fff" />;
+        default:
+          return null;
+      }
+    };
 
-  // دالة مساعدة لاختيار الأيقونة بناءً على الحالة
-  const getStatusIcon = (status: Message["status"]) => {
-    switch (status) {
-      case "sent":
-        return <Ionicons name="checkmark-outline" size={14} color="#ccc" />;
-      case "delivered":
-        return <Ionicons name="checkmark-done-outline" size={14} color="#4caf50" />;
-      case "received":
-        return <Ionicons name="arrow-down-circle-outline" size={14} color="#2196f3" />;
-      case "seen":
-        return <Ionicons name="eye-outline" size={14} color="#9c27b0" />;
-      default:
-        return null;
-    }
-  };
-
-  return (
-    <View
-      style={[
-        styles.messageContainer,
-        { justifyContent: isMyMessage ? "flex-end" : "flex-start" },
-      ]}
-    >
+    return (
       <View
         style={[
-          styles.messageBubble,
-          {
-            backgroundColor: isMyMessage
-              ? darkMode
-                ? "#0B93F6"
-                : "#007AFF"
-              : darkMode
-                ? "#3A3A3C"
-                : "#E5E5EA",
-            borderBottomRightRadius: isMyMessage ? 0 : 20,
-            borderBottomLeftRadius: isMyMessage ? 20 : 0,
-          },
+          styles.messageContainer,
+          { justifyContent: isMyMessage ? "flex-end" : "flex-start" },
         ]}
       >
-        <Text
-          style={[
-            styles.messageText,
-            { color: isMyMessage ? "#fff" : darkMode ? "#fff" : "#000" },
-          ]}
-        >
-          {item.text}
-        </Text>
         <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "flex-end",
-            alignItems: "center",
-            marginTop: 4,
-          }}
+          style={[
+            styles.messageBubble,
+            {
+              backgroundColor: isMyMessage
+                ? darkMode
+                  ? "#6A2D91"
+                  : "#6A2D91"
+                : darkMode
+                  ? "#3A3A3C"
+                  : "#E5E5EA",
+              borderBottomRightRadius: isMyMessage ? 0 : 20,
+              borderBottomLeftRadius: isMyMessage ? 20 : 0,
+            },
+          ]}
         >
           <Text
             style={[
-              styles.timeText,
-              { color: isMyMessage ? "#d1eaff" : darkMode ? "#aaa" : "#666" },
+              styles.messageText,
+              { color: isMyMessage ? "#fff" : darkMode ? "#fff" : "#000" },
             ]}
           >
-            {formatTime(item.timestamp)}
+            {item.text}
           </Text>
-          {isMyMessage && (
-            <View style={{ marginLeft: 4 }}>
-              {getStatusIcon(item.status)}
-            </View>
-          )}
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              marginTop: 0,
+            }}
+          >
+            <Text
+              style={[
+                styles.timeText,
+                { color: isMyMessage ? "#d1eaff" : darkMode ? "#aaa" : "#666" },
+              ]}
+            >
+              {formatTime(item.timestamp)}
+            </Text>
+            {isMyMessage && <View style={{ marginLeft: 4 }}>{getStatusIcon(item.status)}</View>}
+          </View>
         </View>
       </View>
-    </View>
-  );
-};
-
+    );
+  };
 
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const MAX_KEYBOARD_HEIGHT = 90;
 
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener("keyboardDidShow", (e: KeyboardEvent) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardHeight(0);
+    });
 
-useEffect(() => {
-  const showSubscription = Keyboard.addListener("keyboardDidShow", (e: KeyboardEvent) => {
-    setKeyboardHeight(e.endCoordinates.height);
-  });
-  const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
-    setKeyboardHeight(0);
-  });
-
-  return () => {
-    showSubscription.remove();
-    hideSubscription.remove();
-  };
-}, []);
-
-const MAX_KEYBOARD_HEIGHT = 90;
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: darkMode ? "#000" : "#fff" }}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0} // بدل 100 إلى 0
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
         style={{ flex: 1 }}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <View style={{ flex: 1, paddingBottom: Math.min(keyboardHeight, MAX_KEYBOARD_HEIGHT) }}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View style={{ flex: 1, paddingBottom: Math.min(keyboardHeight, MAX_KEYBOARD_HEIGHT) }}>
             <FlatList<Message>
               ref={flatListRef}
               data={messages}
-                extraData={messages}   // هذا يضمن إعادة التحديث عند تغير messages
-
+              extraData={messages}
               keyExtractor={(item) => item._id}
               renderItem={renderItem}
               contentContainerStyle={styles.flatListContent}
@@ -208,7 +209,10 @@ const MAX_KEYBOARD_HEIGHT = 90;
             <View
               style={[
                 styles.inputContainer,
-                { backgroundColor: darkMode ? "#121212" : "#f2f2f2" },
+                {
+                  backgroundColor: darkMode ? "#121212" : "#f2f2f2",
+                  paddingBottom: insets.bottom || 12, // **هنا تم إضافة مساحة آمنة في الأسفل**
+                },
               ]}
             >
               <TextInput
@@ -227,8 +231,6 @@ const MAX_KEYBOARD_HEIGHT = 90;
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </SafeAreaView>
-
-
   );
 }
 
@@ -244,7 +246,7 @@ const styles = StyleSheet.create({
   },
   messageBubble: {
     maxWidth: "85%",
-    paddingVertical: 10,
+    paddingVertical: 5,
     paddingHorizontal: 16,
     borderRadius: 20,
     shadowColor: "#000",
@@ -276,7 +278,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     fontSize: 16,
   },
-
   iconButton: {
     paddingLeft: 12,
   },

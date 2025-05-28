@@ -9,8 +9,10 @@ const Notification = require('../../models/notification');
 const { JWT_SECRET } = require('../../config');
 const jwt = require('jsonwebtoken');
 const Message = require('../../models/Message');
+  const activeChats = {}; // userId -> currently opened chat userId
 
 async function handleMessage(message, ws, userSockets) {
+
   let msg;
   try {
     msg = JSON.parse(message);
@@ -69,86 +71,86 @@ async function handleMessage(message, ws, userSockets) {
     }
 
     // الرد على طلب صداقة
-   case 'friend_request_response': {
-  if (msg.accepted) {
-    // تحقق من صحة المعرفات
-    if (!ws.userId || !msg.toUserId) {
-      console.error('Missing user IDs for friend request response');
-      return;
-    }
+    case 'friend_request_response': {
+      if (msg.accepted) {
+        // تحقق من صحة المعرفات
+        if (!ws.userId || !msg.toUserId) {
+          console.error('Missing user IDs for friend request response');
+          return;
+        }
 
-    try {
-      // تحديث أصدقاء الطرفين بالتوازي وانتظار اكتمالهما
-      await Promise.all([
-        User.findByIdAndUpdate(ws.userId, { $addToSet: { friends: msg.toUserId } }),
-        User.findByIdAndUpdate(msg.toUserId, { $addToSet: { friends: ws.userId } }),
-      ]);
+        try {
+          // تحديث أصدقاء الطرفين بالتوازي وانتظار اكتمالهما
+          await Promise.all([
+            User.findByIdAndUpdate(ws.userId, { $addToSet: { friends: msg.toUserId } }),
+            User.findByIdAndUpdate(msg.toUserId, { $addToSet: { friends: ws.userId } }),
+          ]);
 
-      // جلب بيانات المستخدمين بعد التحديث بدون الحقول الحساسة
-      const [me, friend] = await Promise.all([
-        User.findById(ws.userId).select('-password -__v'),
-        User.findById(msg.toUserId).select('-password -__v')
-      ]);
+          // جلب بيانات المستخدمين بعد التحديث بدون الحقول الحساسة
+          const [me, friend] = await Promise.all([
+            User.findById(ws.userId).select('-password -__v'),
+            User.findById(msg.toUserId).select('-password -__v')
+          ]);
 
-      if (!me || !friend) {
-        console.error('User data not found after update');
-        return;
+          if (!me || !friend) {
+            console.error('User data not found after update');
+            return;
+          }
+
+          // إرسال إشعار إضافة الصديق للمستخدم الذي قبل الطلب
+          sendToUser(userSockets, ws.userId, {
+            type: 'new_friend_added',
+            user: {
+              _id: friend._id,
+              username: friend.username,
+              profilePic: friend.profilePic,
+              status: friend.status,
+              selectedAvatar: friend.selectedAvatar,
+              selectedFrame: friend.selectedFrame,
+              selectedEffect: friend.selectedEffect,
+              selectedBackground: friend.selectedBackground,
+              subscription: friend.subscription,
+              coins: friend.coins
+            }
+          });
+
+          // إرسال إشعار إضافة الصديق للطرف الآخر (مرسل الطلب)
+          sendToUser(userSockets, msg.toUserId, {
+            type: 'new_friend_added',
+            user: {
+              _id: me._id,
+              username: me.username,
+              profilePic: me.profilePic,
+              status: me.status,
+              selectedAvatar: me.selectedAvatar,
+              selectedFrame: me.selectedFrame,
+              selectedEffect: me.selectedEffect,
+              selectedBackground: me.selectedBackground,
+              subscription: me.subscription,
+              coins: me.coins
+            }
+          });
+
+        } catch (error) {
+          console.error('Error updating friends:', error);
+          return;
+        }
       }
 
-      // إرسال إشعار إضافة الصديق للمستخدم الذي قبل الطلب
-      sendToUser(userSockets, ws.userId, {
-        type: 'new_friend_added',
-        user: {
-          _id: friend._id,
-          username: friend.username,
-          profilePic: friend.profilePic,
-          status: friend.status,
-          selectedAvatar: friend.selectedAvatar,
-          selectedFrame: friend.selectedFrame,
-          selectedEffect: friend.selectedEffect,
-          selectedBackground: friend.selectedBackground,
-          subscription: friend.subscription,
-          coins: friend.coins
-        }
+      // حذف طلب الصداقة بعد قبول أو رفض الطلب
+      await FriendRequest.findOneAndDelete({
+        sender: msg.toUserId,
+        receiver: ws.userId,
       });
 
-      // إرسال إشعار إضافة الصديق للطرف الآخر (مرسل الطلب)
+      // إرسال نتيجة قبول أو رفض طلب الصداقة للطرف الآخر
       sendToUser(userSockets, msg.toUserId, {
-        type: 'new_friend_added',
-        user: {
-          _id: me._id,
-          username: me.username,
-          profilePic: me.profilePic,
-          status: me.status,
-          selectedAvatar: me.selectedAvatar,
-          selectedFrame: me.selectedFrame,
-          selectedEffect: me.selectedEffect,
-          selectedBackground: me.selectedBackground,
-          subscription: me.subscription,
-          coins: me.coins
-        }
+        type: 'friend_request_result',
+        fromUserId: ws.userId,
+        accepted: msg.accepted,
       });
-
-    } catch (error) {
-      console.error('Error updating friends:', error);
-      return;
+      break;
     }
-  }
-
-  // حذف طلب الصداقة بعد قبول أو رفض الطلب
-  await FriendRequest.findOneAndDelete({
-    sender: msg.toUserId,
-    receiver: ws.userId,
-  });
-
-  // إرسال نتيجة قبول أو رفض طلب الصداقة للطرف الآخر
-  sendToUser(userSockets, msg.toUserId, {
-    type: 'friend_request_result',
-    fromUserId: ws.userId,
-    accepted: msg.accepted,
-  });
-  break;
-}
 
     // جلب طلبات الصداقة المعلقة
     case 'get_friend_requests': {
@@ -245,17 +247,17 @@ async function handleMessage(message, ws, userSockets) {
       }
 
       // تحقق من معرف المستخدم داخل التوكن
-    if (decoded.id !== ws.userId) {
-  sendToUser(userSockets, ws.userId, {
-    type: 'status_update_failed',
-    message: 'عدم تطابق هوية المستخدم',
-  });
-  return;
-}
+      if (decoded.id !== ws.userId) {
+        sendToUser(userSockets, ws.userId, {
+          type: 'status_update_failed',
+          message: 'عدم تطابق هوية المستخدم',
+        });
+        return;
+      }
 
 
 
-     
+
 
       const updatedUser = await User.findByIdAndUpdate(
         ws.userId,
@@ -294,174 +296,248 @@ async function handleMessage(message, ws, userSockets) {
     }
 
 
-case 'private_message': {
-  const { toUserId, text, tempId } = msg;
-console.log(`[private_message] Target userId: ${toUserId}`);
-  console.log(`[private_message] Connected users:`, Object.keys(userSockets));
+    case 'private_message': {
+      const { toUserId, text, tempId } = msg;
+      console.log(`[private_message] Target userId: ${toUserId}`);
+      console.log(`[private_message] Connected users:`, Object.keys(userSockets));
 
-  const newMessage = new Message({
-    sender: ws.userId,
-    receiver: toUserId,
-    text,
-    timestamp: new Date(),
-    status: 'sent',
-  });
-
-  await newMessage.save();
-
-  // تأكيد للمرسل
-  sendToUser(userSockets, ws.userId, {
-    type: 'message_sent_confirmation',
-    messageId: newMessage._id.toString(),
-    tempId,
-    status: 'sent',
-  });
-
-  // إرسال للمستلم
-  sendToUser(userSockets, toUserId, {
-    type: 'new_private_message',
-    message: {
-      _id: newMessage._id.toString(),
-      sender: ws.userId,
-      receiver: toUserId,
-      text,
-      timestamp: newMessage.timestamp.toISOString(),
-      status: 'sent',
-    },
-  });
-
-  // حالة الاتصال وتفاصيل المستلم
-const receiverSocket = userSockets.get(toUserId);
-  console.log(receiverSocket,"receiverSocket");
-  
-  if (receiverSocket) {
-    console.log(`[private_message] User ${toUserId} is online.`);
-    console.log(`  Receiver Socket ID: ${receiverSocket.id}`);
-    console.log(`  Receiver User ID: ${receiverSocket.userId}`);
-    if (receiverSocket.username) {
-      console.log(`  Receiver Username: ${receiverSocket.username}`);
-    }
-
-    // تحديث الحالة إلى delivered
-    newMessage.status = 'delivered';
-    await newMessage.save();
-
-    sendToUser(userSockets, ws.userId, {
-      type: 'message_status_updated',
-      messageId: newMessage._id.toString(),
-      status: 'delivered',
-      receiverId: toUserId,
-    });
-  } else {
-    console.log(`[private_message] User ${toUserId} is offline. Message saved as sent.`);
-  }
-
-  break;
-}
-
-
-
-
-
-
-case 'update_message_status': {
-  const { messageId, status } = msg;
-  const validStatuses = ['delivered', 'received', 'seen'];
-
-  if (!validStatuses.includes(status)) return;
-
-  // جلب الرسالة من قاعدة البيانات
-  const messageDoc = await Message.findById(messageId);
-  if (!messageDoc) return;
-
-  // تحقق من أن المستخدم الحالي هو المستلم للرسالة
-  if (messageDoc.receiver.toString() !== ws.userId) return;
-
-  // تحديث حالة الرسالة إذا كانت الحالة الجديدة أعلى ترتيبًا من الحالة السابقة
-  // ترتيب الحالات: sent < delivered < received < seen
-  const statusOrder = {
-    sent: 0,
-    delivered: 1,
-    received: 2,
-    seen: 3
-  };
-
-  if (statusOrder[status] > statusOrder[messageDoc.status]) {
-    messageDoc.status = status;
-    await messageDoc.save();
-
-    // إرسال التحديث للمرسل
-    sendToUser(userSockets, messageDoc.sender.toString(), {
-      type: 'message_status_updated',
-      messageId: messageDoc._id,
-      status: messageDoc.status,
-      receiverId: ws.userId
-    });
-  }
-  break;
-}
-
-
-
-case 'get_conversation': {
-  const { withUserId } = msg;
-
-  // جلب الرسائل التي أرسلها أو استلمها المستخدم مع الطرف الآخر، مرتبة زمنياً
-  const messages = await Message.find({
-    $or: [
-      { sender: ws.userId, receiver: withUserId },
-      { sender: withUserId, receiver: ws.userId }
-    ]
-  }).sort({ timestamp: 1 }); // ترتيب تصاعدي حسب التاريخ
-
-  // طباعة بيانات المحادثة في سجل السيرفر
-  console.log(`[get_conversation] Conversation between ${ws.userId} and ${withUserId}:`);
-  messages.forEach(msg => {
-    const senderLabel = msg.sender.toString() === ws.userId ? 'Me' : 'Them';
-    console.log(`  [${msg.timestamp.toISOString()}] ${senderLabel}: ${msg.text}`);
-  });
-
-  // إرسال المحادثة إلى المستخدم
-  sendToUser(userSockets, ws.userId, {
-    type: 'conversation_history',
-    messages
-  });
-
-  break;
-}
-
-case 'mark_as_read': {
-  const { messageId } = msg;
-
-  const message = await Message.findById(messageId);
-  if (!message) {
-    return;
-  }
-
-  // تأكد أن المستخدم الحالي هو المستقبل
-  if (message.receiver.toString() !== ws.userId) {
-    return;
-  }
-
-  // إذا كانت الحالة أقل من "read"، حدّثها
-  if (message.status !== 'read') {
-    message.status = 'read';
-    await message.save();
-
-    // أرسل للطرف الآخر أن الرسالة قُرئت
-    const senderId = message.sender.toString();
-    if (userSockets[senderId]) {
-      sendToUser(userSockets, senderId, {
-        type: 'message_read',
-        messageId: message._id
+      const newMessage = new Message({
+        sender: ws.userId,
+        receiver: toUserId,
+        text,
+        timestamp: new Date(),
+        status: 'sent',
       });
-    }
-  }
 
+      await newMessage.save();
+
+      // تأكيد للمرسل
+      sendToUser(userSockets, ws.userId, {
+        type: 'message_sent_confirmation',
+        messageId: newMessage._id.toString(),
+        tempId,
+        status: 'sent',
+      });
+
+      // إرسال للمستلم
+      sendToUser(userSockets, toUserId, {
+        type: 'new_private_message',
+        message: {
+          _id: newMessage._id.toString(),
+          sender: ws.userId,
+          receiver: toUserId,
+          text,
+          timestamp: newMessage.timestamp.toISOString(),
+          status: 'sent',
+        },
+      });
+
+      const receiver = await User.findById(toUserId);
+
+      if (receiver && receiver.status === 'online') {
+
+        console.log(`حالة المستخدم ${receiver.username} هي: ${receiver.status}`);
+        const isChatOpen = activeChats[toUserId] === ws.userId;
+console.log(activeChats,"activeChats");
+console.log(isChatOpen,"isChatOpen");
+
+        if (isChatOpen) {
+          newMessage.status = 'seen';
+        } else {
+          newMessage.status = 'delivered';
+        }
+
+        // تحديث الحالة إلى delivered
+        await newMessage.save();
+
+        sendToUser(userSockets, ws.userId, {
+          type: 'message_status_updated',
+          messageId: newMessage._id.toString(),
+          status:isChatOpen ? 'seen' : 'delivered',
+          receiverId: toUserId,
+        });
+      } else {
+        console.log(`[private_message] User ${toUserId} is offline. Message saved as sent.`);
+      }
+
+      break;
+    }
+
+
+
+
+
+
+    case 'update_message_status': {
+      const { messageId, status } = msg;
+      const validStatuses = ['delivered', 'received', 'seen'];
+
+      if (!validStatuses.includes(status)) return;
+
+      // جلب الرسالة من قاعدة البيانات
+      const messageDoc = await Message.findById(messageId);
+      if (!messageDoc) return;
+
+      // تحقق من أن المستخدم الحالي هو المستلم للرسالة
+      if (messageDoc.receiver.toString() !== ws.userId) return;
+
+      // تحديث حالة الرسالة إذا كانت الحالة الجديدة أعلى ترتيبًا من الحالة السابقة
+      // ترتيب الحالات: sent < delivered < received < seen
+      const statusOrder = {
+        sent: 0,
+        delivered: 1,
+        received: 2,
+        seen: 3
+      };
+
+      if (statusOrder[status] > statusOrder[messageDoc.status]) {
+        messageDoc.status = status;
+        await messageDoc.save();
+
+        // إرسال التحديث للمرسل
+        sendToUser(userSockets, messageDoc.sender.toString(), {
+          type: 'message_status_updated',
+          messageId: messageDoc._id,
+          status: messageDoc.status,
+          receiverId: ws.userId
+        });
+      }
+      break;
+    }
+
+
+
+    case 'get_conversation': {
+      const { withUserId } = msg;
+
+      // جلب الرسائل التي أرسلها أو استلمها المستخدم مع الطرف الآخر، مرتبة زمنياً
+      const messages = await Message.find({
+        $or: [
+          { sender: ws.userId, receiver: withUserId },
+          { sender: withUserId, receiver: ws.userId }
+        ]
+      }).sort({ timestamp: 1 }); // ترتيب تصاعدي حسب التاريخ
+
+      // طباعة بيانات المحادثة في سجل السيرفر
+      console.log(`[get_conversation] Conversation between ${ws.userId} and ${withUserId}:`);
+      messages.forEach(msg => {
+        const senderLabel = msg.sender.toString() === ws.userId ? 'Me' : 'Them';
+        console.log(`  [${msg.timestamp.toISOString()}] ${senderLabel}: ${msg.text}`);
+      });
+
+      // إرسال المحادثة إلى المستخدم
+      sendToUser(userSockets, ws.userId, {
+        type: 'conversation_history',
+        messages
+      });
+
+      break;
+    }
+
+    case 'mark_as_read': {
+      const { messageId } = msg;
+
+      const message = await Message.findById(messageId);
+      if (!message) {
+        return;
+      }
+
+      // تأكد أن المستخدم الحالي هو المستقبل
+      if (message.receiver.toString() !== ws.userId) {
+        return;
+      }
+
+      // إذا كانت الحالة أقل من "read"، حدّثها
+      if (message.status !== 'read') {
+        message.status = 'read';
+        await message.save();
+
+        // أرسل للطرف الآخر أن الرسالة قُرئت
+        const senderId = message.sender.toString();
+        if (userSockets[senderId]) {
+          sendToUser(userSockets, senderId, {
+            type: 'message_read',
+            messageId: message._id
+          });
+        }
+      }
+
+      break;
+    }
+
+    case 'open_private_chat': {
+      const { withUserId } = msg;
+
+      if (!withUserId) {
+        sendToUser(userSockets, ws.userId, {
+          type: 'chat_open_failed',
+          message: 'معرف المستخدم الآخر مفقود.',
+        });
+        return;
+      }
+
+      try {
+        // جلب كل الرسائل بين المستخدمين
+        const messages = await Message.find({
+          $or: [
+            { sender: ws.userId, receiver: withUserId },
+            { sender: withUserId, receiver: ws.userId }
+          ]
+        }).sort({ timestamp: 1 }); // ترتيب حسب الوقت
+
+        // تحديث حالة الرسائل التي استلمها هذا المستخدم ولم تتم قراءتها بعد
+        await Message.updateMany(
+          {
+            sender: withUserId,
+            receiver: ws.userId,
+            status: { $ne: 'seen' }
+          },
+          { $set: { status: 'seen' } }
+        );
+
+        // إرسال كل الرسائل للمستخدم الذي فتح المحادثة
+        sendToUser(userSockets, ws.userId, {
+          type: 'chat_history',
+          withUserId,
+          messages: messages.map(m => ({
+            _id: m._id.toString(),
+            sender: m.sender,
+            receiver: m.receiver,
+            text: m.text,
+            timestamp: m.timestamp.toISOString(),
+            status: m.status,
+          }))
+        });
+
+        // إعلام الطرف الآخر أن الرسائل تمّت قراءتها (اختياري)
+        sendToUser(userSockets, withUserId, {
+          type: 'messages_seen',
+          byUserId: ws.userId,
+        });
+
+      } catch (err) {
+        console.error('خطأ أثناء فتح المحادثة:', err);
+        sendToUser(userSockets, ws.userId, {
+          type: 'chat_open_failed',
+          message: 'حدث خطأ أثناء جلب الرسائل.',
+        });
+      }
+
+      break;
+    }
+
+    case 'open_chat': {
+      const { withUserId } = msg;
+      activeChats[ws.userId] = withUserId;
+      console.log(`${ws.userId} is now viewing chat with ${withUserId}`);
+      break;
+    }
+
+case 'close_chat': {
+  delete activeChats[ws.userId];
+  console.log(`${ws.userId} has closed the chat`);
   break;
 }
-
-
 
     default:
       break;
