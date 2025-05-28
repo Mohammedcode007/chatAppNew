@@ -293,142 +293,74 @@ async function handleMessage(message, ws, userSockets) {
       break;
     }
 
-// case 'private_message': {
-//   const { toUserId, text, tempId } = msg;
-//   console.log(`[private_message] Received message from ${ws.userId} to ${toUserId}: ${text}`);
 
-//   // التحقق من وجود المستخدم المستقبل
-//   const receiver = await User.findById(toUserId);
-//   if (!receiver) {
-//     console.log(`[private_message] Receiver with ID ${toUserId} not found.`);
-//     return;
-//   }
-//   console.log(`[private_message] Receiver found: ${receiver.username}`);
-
-//   // التحقق من الحظر المتبادل
-//   if (receiver.blockedUsers?.includes(ws.userId) || ws.blockedUsers?.includes(toUserId)) {
-//     console.log(`[private_message] Message blocked: sender ${ws.userId} or receiver ${toUserId} has blocked the other.`);
-//     return sendToUser(userSockets, ws.userId, {
-//       type: 'message_failed',
-//       reason: 'تم الحظر من أحد الطرفين'
-//     });
-//   }
-
-//   // إنشاء الرسالة في قاعدة البيانات
-//   const newMessage = await Message.create({
-//     sender: ws.userId,
-//     receiver: toUserId,
-//     text,
-//     status: userSockets[toUserId] ? 'delivered' : 'sent',
-//     isBlocked: false
-//   });
-//   console.log(`[private_message] Message saved with ID ${newMessage._id} and status ${newMessage.status}`);
-
-//   // إرسال الرسالة إلى المستقبل إذا كان متصلاً
-//   if (userSockets[toUserId]) {
-//     sendToUser(userSockets, toUserId, {
-//       type: 'new_private_message',
-//       message: {
-//         _id: newMessage._id,
-//         sender: ws.userId,
-//         receiver: toUserId,
-//         text: newMessage.text,
-//         timestamp: newMessage.timestamp,
-//         status: newMessage.status
-//       }
-//     });
-//     console.log(`[private_message] Message sent to receiver ${toUserId}`);
-//   } else {
-//     console.log(`[private_message] Receiver ${toUserId} is offline, message status set to 'sent'`);
-//   }
-
-//   // تأكيد الإرسال للمرسل مع إعادة tempId
-//   sendToUser(userSockets, ws.userId, {
-//     type: 'message_sent_confirmation',
-//     tempId,
-//     messageId: newMessage._id,
-//     status: newMessage.status
-//   });
-//   console.log(`[private_message] Confirmation sent to sender ${ws.userId}`);
-
-//   // طباعة المحادثة الحالية بين الطرفين بعد إرسال الرسالة
-//   const conversation = await Message.find({
-//     $or: [
-//       { sender: ws.userId, receiver: toUserId },
-//       { sender: toUserId, receiver: ws.userId }
-//     ]
-//   }).sort({ timestamp: 1 });
-
-//   console.log(`[private_message] Conversation between ${ws.userId} and ${toUserId}:`);
-//   conversation.forEach(msg => {
-//     const senderLabel = msg.sender.toString() === ws.userId ? 'Me' : receiver.username;
-//     console.log(`  [${msg.timestamp.toISOString()}] ${senderLabel}: ${msg.text}`);
-//   });
-
-//   break;
-// }
 case 'private_message': {
   const { toUserId, text, tempId } = msg;
-  console.log(`[private_message] Received message from ${ws.userId} to ${toUserId}: ${text}`);
+console.log(`[private_message] Target userId: ${toUserId}`);
+  console.log(`[private_message] Connected users:`, Object.keys(userSockets));
 
-  const receiver = await User.findById(toUserId);
-  if (!receiver) {
-    console.log(`[private_message] Receiver with ID ${toUserId} not found.`);
-    return;
-  }
-
-  if (receiver.blockedUsers?.includes(ws.userId) || ws.blockedUsers?.includes(toUserId)) {
-    return sendToUser(userSockets, ws.userId, {
-      type: 'message_failed',
-      reason: 'تم الحظر من أحد الطرفين'
-    });
-  }
-
-  const newMessage = await Message.create({
+  const newMessage = new Message({
     sender: ws.userId,
     receiver: toUserId,
     text,
+    timestamp: new Date(),
     status: 'sent',
-    isBlocked: false,
-    timestamp: new Date()
   });
 
-  console.log('New message created:', newMessage);
+  await newMessage.save();
 
-  // إرسال الرسالة للطرف المستقبل فوراً مع تحديث الحالة
-  if (userSockets[toUserId]) {
-    sendToUser(userSockets, toUserId, {
-      type: 'new_private_message',
-      message: {
-        _id: newMessage._id,
-        sender: ws.userId,
-        receiver: toUserId,
-        text: newMessage.text,
-        timestamp: newMessage.timestamp,
-        status: 'delivered'
-      }
-    });
-
-    // تحديث حالة الرسالة في DB إلى delivered
-    await Message.findByIdAndUpdate(newMessage._id, { status: 'delivered' });
-  }
-
-  // تأكيد الإرسال للطرف المرسل مع الحالة
+  // تأكيد للمرسل
   sendToUser(userSockets, ws.userId, {
     type: 'message_sent_confirmation',
+    messageId: newMessage._id.toString(),
     tempId,
+    status: 'sent',
+  });
+
+  // إرسال للمستلم
+  sendToUser(userSockets, toUserId, {
+    type: 'new_private_message',
     message: {
-      _id: newMessage._id,
+      _id: newMessage._id.toString(),
       sender: ws.userId,
       receiver: toUserId,
-      text: newMessage.text,
-      timestamp: newMessage.timestamp,
-      status: userSockets[toUserId] ? 'delivered' : 'sent'
-    }
+      text,
+      timestamp: newMessage.timestamp.toISOString(),
+      status: 'sent',
+    },
   });
+
+  // حالة الاتصال وتفاصيل المستلم
+const receiverSocket = userSockets.get(toUserId);
+  console.log(receiverSocket,"receiverSocket");
+  
+  if (receiverSocket) {
+    console.log(`[private_message] User ${toUserId} is online.`);
+    console.log(`  Receiver Socket ID: ${receiverSocket.id}`);
+    console.log(`  Receiver User ID: ${receiverSocket.userId}`);
+    if (receiverSocket.username) {
+      console.log(`  Receiver Username: ${receiverSocket.username}`);
+    }
+
+    // تحديث الحالة إلى delivered
+    newMessage.status = 'delivered';
+    await newMessage.save();
+
+    sendToUser(userSockets, ws.userId, {
+      type: 'message_status_updated',
+      messageId: newMessage._id.toString(),
+      status: 'delivered',
+      receiverId: toUserId,
+    });
+  } else {
+    console.log(`[private_message] User ${toUserId} is offline. Message saved as sent.`);
+  }
 
   break;
 }
+
+
+
 
 
 
