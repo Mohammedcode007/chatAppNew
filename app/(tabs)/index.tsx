@@ -286,7 +286,6 @@ const { conversations, loading, refreshConversations } = useAllConversations();
   const filteredConversations = conversations.filter((conv) =>
     conv.withUsername.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  console.log(filteredConversations,"filteredConversations");
   
 
   if (loading) {
@@ -339,8 +338,8 @@ const { conversations, loading, refreshConversations } = useAllConversations();
               style={dynamicStyles.chatItem}
               onPress={() =>
                 router.push(
-                  //  `/chat/${item.withUserId}?name=${encodeURIComponent(item.withUsername)}&status=${item.withStatus}`
-                  `/chat/${item.withUserId}?name=${encodeURIComponent(item.withUsername)}`
+                   `/chat/${item.withUserId}?name=${encodeURIComponent(item.withUsername)}&status=${item.userStatus}`
+                  // `/chat/${item.withUserId}?name=${encodeURIComponent(item.withUsername)}`
                 )
               }
             >

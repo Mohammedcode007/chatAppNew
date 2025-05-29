@@ -312,98 +312,208 @@ case 'update_status': {
 
 
 
-    case 'private_message': {
-      const { toUserId, text, tempId } = msg;
+    // case 'private_message': {
+    //   const { toUserId, text, tempId } = msg;
 
-      // إنشاء الرسالة الجديدة
-      const newMessage = new Message({
+    //   // إنشاء الرسالة الجديدة
+    //   const newMessage = new Message({
+    //     sender: ws.userId,
+    //     receiver: toUserId,
+    //     text,
+    //     timestamp: new Date(),
+    //     status: 'sent',
+    //   });
+
+    //   await newMessage.save();
+
+    //   // تأكيد للمرسل
+    //   sendToUser(userSockets, ws.userId, {
+    //     type: 'message_sent_confirmation',
+    //     messageId: newMessage._id.toString(),
+    //     tempId,
+    //     status: 'sent',
+    //   });
+
+    //   // إرسال الرسالة للمستلم
+    //   sendToUser(userSockets, toUserId, {
+    //     type: 'new_private_message',
+    //     message: {
+    //       _id: newMessage._id.toString(),
+    //       sender: ws.userId,
+    //       receiver: toUserId,
+    //       text,
+    //       timestamp: newMessage.timestamp.toISOString(),
+    //       status: 'sent',
+    //     },
+    //   });
+
+    //   // تحديث الحالة حسب حالة المستلم
+    //   const receiver = await User.findById(toUserId);
+
+    //   if (receiver && receiver.status === 'online') {
+    //     const isChatOpen = activeChats[toUserId] === ws.userId;
+
+    //     if (isChatOpen) {
+    //       newMessage.status = 'seen';
+    //     } else {
+    //       newMessage.status = 'delivered';
+    //     }
+
+    //     await newMessage.save();
+
+    //     // إشعار المرسل بتحديث الحالة
+    //     sendToUser(userSockets, ws.userId, {
+    //       type: 'message_status_updated',
+    //       messageId: newMessage._id.toString(),
+    //       status: newMessage.status,
+    //       receiverId: toUserId,
+    //     });
+
+    //     // إذا لم يكن المستقبل فاتح المحادثة، أرسل له تحديث `conversation_updated`
+    //     if (!isChatOpen) {
+    //       // حساب عدد الرسائل غير المقروءة
+    //       const unreadCount = await Message.countDocuments({
+    //         sender: ws.userId,
+    //         receiver: toUserId,
+    //         status: { $ne: 'seen' },
+    //       });
+
+    //       const senderUser = await User.findById(ws.userId, 'username avatarUrl').lean();
+
+    //       sendToUser(userSockets, toUserId, {
+    //         type: 'conversation_updated',
+    //         conversation: {
+    //           withUserId: ws.userId,
+    //           withUsername: senderUser?.username || 'Unknown',
+    //           withAvatarUrl: senderUser?.avatarUrl || null,
+    //           unreadCount,
+    //           lastMessage: {
+    //             _id: newMessage._id.toString(),
+    //             sender: ws.userId,
+    //             receiver: toUserId,
+    //             text,
+    //             timestamp: newMessage.timestamp,
+    //             status: newMessage.status,
+    //           },
+    //         },
+    //       });
+    //     }
+    //   }
+
+    //   break;
+    // }
+
+
+case 'private_message': {
+  const { toUserId, text, tempId } = msg;
+
+  // التحقق من وجود المرسل والمستلم
+  const sender = await User.findById(ws.userId);
+  const receiver = await User.findById(toUserId);
+
+  if (!sender || !receiver) {
+    sendToUser(userSockets, ws.userId, {
+      type: 'message_failed',
+      tempId,
+      reason: 'المستخدم غير موجود',
+    });
+    return;
+  }
+
+  // التحقق من الحظر
+  const senderBlockedReceiver = sender.blockedUsers.includes(toUserId);
+  const receiverBlockedSender = receiver.blockedUsers.includes(ws.userId);
+
+  if (senderBlockedReceiver || receiverBlockedSender) {
+    sendToUser(userSockets, ws.userId, {
+      type: 'message_blocked',
+      tempId,
+      reason: senderBlockedReceiver
+        ? 'لقد قمت بحظر هذا المستخدم'
+        : 'هذا المستخدم قام بحظرك، لا يمكنك إرسال رسائل إليه',
+    });
+    return;
+  }
+
+  // إنشاء الرسالة الجديدة
+  const newMessage = new Message({
+    sender: ws.userId,
+    receiver: toUserId,
+    text,
+    timestamp: new Date(),
+    status: 'sent',
+  });
+
+  await newMessage.save();
+
+  // تأكيد للمرسل
+  sendToUser(userSockets, ws.userId, {
+    type: 'message_sent_confirmation',
+    messageId: newMessage._id.toString(),
+    tempId,
+    status: 'sent',
+  });
+
+  // إرسال الرسالة للمستلم
+  sendToUser(userSockets, toUserId, {
+    type: 'new_private_message',
+    message: {
+      _id: newMessage._id.toString(),
+      sender: ws.userId,
+      receiver: toUserId,
+      text,
+      timestamp: newMessage.timestamp.toISOString(),
+      status: 'sent',
+    },
+  });
+
+  // تحديث حالة الرسالة حسب حالة المستلم
+  if (receiver.status === 'online') {
+    const isChatOpen = activeChats[toUserId] === ws.userId;
+
+    newMessage.status = isChatOpen ? 'seen' : 'delivered';
+    await newMessage.save();
+
+    // إشعار المرسل بتحديث الحالة
+    sendToUser(userSockets, ws.userId, {
+      type: 'message_status_updated',
+      messageId: newMessage._id.toString(),
+      status: newMessage.status,
+      receiverId: toUserId,
+    });
+
+    // إرسال إشعار للمستلم إذا لم يكن يفتح المحادثة
+    if (!isChatOpen) {
+      const unreadCount = await Message.countDocuments({
         sender: ws.userId,
         receiver: toUserId,
-        text,
-        timestamp: new Date(),
-        status: 'sent',
+        status: { $ne: 'seen' },
       });
 
-      await newMessage.save();
+      const senderUser = await User.findById(ws.userId, 'username avatarUrl').lean();
 
-      // تأكيد للمرسل
-      sendToUser(userSockets, ws.userId, {
-        type: 'message_sent_confirmation',
-        messageId: newMessage._id.toString(),
-        tempId,
-        status: 'sent',
-      });
-
-      // إرسال الرسالة للمستلم
       sendToUser(userSockets, toUserId, {
-        type: 'new_private_message',
-        message: {
-          _id: newMessage._id.toString(),
-          sender: ws.userId,
-          receiver: toUserId,
-          text,
-          timestamp: newMessage.timestamp.toISOString(),
-          status: 'sent',
-        },
-      });
-
-      // تحديث الحالة حسب حالة المستلم
-      const receiver = await User.findById(toUserId);
-
-      if (receiver && receiver.status === 'online') {
-        const isChatOpen = activeChats[toUserId] === ws.userId;
-
-        if (isChatOpen) {
-          newMessage.status = 'seen';
-        } else {
-          newMessage.status = 'delivered';
-        }
-
-        await newMessage.save();
-
-        // إشعار المرسل بتحديث الحالة
-        sendToUser(userSockets, ws.userId, {
-          type: 'message_status_updated',
-          messageId: newMessage._id.toString(),
-          status: newMessage.status,
-          receiverId: toUserId,
-        });
-
-        // إذا لم يكن المستقبل فاتح المحادثة، أرسل له تحديث `conversation_updated`
-        if (!isChatOpen) {
-          // حساب عدد الرسائل غير المقروءة
-          const unreadCount = await Message.countDocuments({
+        type: 'conversation_updated',
+        conversation: {
+          withUserId: ws.userId,
+          withUsername: senderUser?.username || 'Unknown',
+          withAvatarUrl: senderUser?.avatarUrl || null,
+          unreadCount,
+          lastMessage: {
+            _id: newMessage._id.toString(),
             sender: ws.userId,
             receiver: toUserId,
-            status: { $ne: 'seen' },
-          });
-
-          const senderUser = await User.findById(ws.userId, 'username avatarUrl').lean();
-
-          sendToUser(userSockets, toUserId, {
-            type: 'conversation_updated',
-            conversation: {
-              withUserId: ws.userId,
-              withUsername: senderUser?.username || 'Unknown',
-              withAvatarUrl: senderUser?.avatarUrl || null,
-              unreadCount,
-              lastMessage: {
-                _id: newMessage._id.toString(),
-                sender: ws.userId,
-                receiver: toUserId,
-                text,
-                timestamp: newMessage.timestamp,
-                status: newMessage.status,
-              },
-            },
-          });
-        }
-      }
-
-      break;
+            text,
+            timestamp: newMessage.timestamp,
+            status: newMessage.status,
+          },
+        },
+      });
     }
+  }
 
-
+  break;
+}
 
 
 
@@ -578,171 +688,275 @@ case 'update_status': {
       console.log(`${ws.userId} has closed the chat`);
       break;
     }
-    case 'get_all_conversations': {
-      const allMessages = await Message.find({
-        $or: [
-          { sender: ws.userId },
-          { receiver: ws.userId }
-        ]
-      }).sort({ timestamp: 1 });
+    // case 'get_all_conversations': {
+    //   const allMessages = await Message.find({
+    //     $or: [
+    //       { sender: ws.userId },
+    //       { receiver: ws.userId }
+    //     ]
+    //   }).sort({ timestamp: 1 });
 
-      const conversationsMap = {};
+    //   const conversationsMap = {};
 
-      allMessages.forEach(message => {
-        const otherUserId = message.sender.toString() === ws.userId ? message.receiver.toString() : message.sender.toString();
+    //   allMessages.forEach(message => {
+    //     const otherUserId = message.sender.toString() === ws.userId ? message.receiver.toString() : message.sender.toString();
 
-        if (!conversationsMap[otherUserId]) {
-          conversationsMap[otherUserId] = {
-            messages: [],
-            unreadCount: 0,
-            lastMessage: null,
-          };
-        }
+    //     if (!conversationsMap[otherUserId]) {
+    //       conversationsMap[otherUserId] = {
+    //         messages: [],
+    //         unreadCount: 0,
+    //         lastMessage: null,
+    //       };
+    //     }
 
-        conversationsMap[otherUserId].messages.push(message);
-        conversationsMap[otherUserId].lastMessage = message;
+    //     conversationsMap[otherUserId].messages.push(message);
+    //     conversationsMap[otherUserId].lastMessage = message;
 
-        if (
-          message.receiver.toString() === ws.userId &&
-          message.status !== 'seen'
-        ) {
-          conversationsMap[otherUserId].unreadCount++;
-        }
-      });
+    //     if (
+    //       message.receiver.toString() === ws.userId &&
+    //       message.status !== 'seen'
+    //     ) {
+    //       conversationsMap[otherUserId].unreadCount++;
+    //     }
+    //   });
 
-      // جلب بيانات المستخدمين مقابل كل محادثة دفعة واحدة لتحسين الأداء
-      const otherUserIds = Object.keys(conversationsMap);
+    //   // جلب بيانات المستخدمين مقابل كل محادثة دفعة واحدة لتحسين الأداء
+    //   const otherUserIds = Object.keys(conversationsMap);
 
-      const usersData = await User.find({ _id: { $in: otherUserIds } }, 'username avatarUrl').lean();
+    //   const usersData = await User.find({ _id: { $in: otherUserIds } }, 'username avatarUrl').lean();
 
-      // تحويل بيانات المستخدمين إلى كائن مفتاحه هو _id لتسهيل الوصول
-      const usersMap = {};
-      usersData.forEach(user => {
-        usersMap[user._id.toString()] = user;
-      });
+    //   // تحويل بيانات المستخدمين إلى كائن مفتاحه هو _id لتسهيل الوصول
+    //   const usersMap = {};
+    //   usersData.forEach(user => {
+    //     usersMap[user._id.toString()] = user;
+    //   });
 
-      const conversations = otherUserIds.map(userId => {
-        const convo = conversationsMap[userId];
-        const user = usersMap[userId] || { username: 'Unknown', avatarUrl: null };
+    //   const conversations = otherUserIds.map(userId => {
+    //     const convo = conversationsMap[userId];
+    //     const user = usersMap[userId] || { username: 'Unknown', avatarUrl: null };
 
-        return {
-          withUserId: userId,
-          withUsername: user.username,
-          withAvatarUrl: user.avatarUrl,
-          unreadCount: convo.unreadCount,
-          lastMessage: {
-            _id: convo.lastMessage._id.toString(),
-            sender: convo.lastMessage.sender.toString(),
-            receiver: convo.lastMessage.receiver.toString(),
-            text: convo.lastMessage.text,
-            timestamp: convo.lastMessage.timestamp,
-            status: convo.lastMessage.status,
-          },
-          messages: convo.messages.map(msg => ({
-            _id: msg._id.toString(),
-            sender: msg.sender.toString(),
-            receiver: msg.receiver.toString(),
-            text: msg.text,
-            timestamp: msg.timestamp,
-            status: msg.status,
-          })),
-        };
-      });
+    //     return {
+    //       withUserId: userId,
+    //       withUsername: user.username,
+    //       withAvatarUrl: user.avatarUrl,
+    //       unreadCount: convo.unreadCount,
+    //       lastMessage: {
+    //         _id: convo.lastMessage._id.toString(),
+    //         sender: convo.lastMessage.sender.toString(),
+    //         receiver: convo.lastMessage.receiver.toString(),
+    //         text: convo.lastMessage.text,
+    //         timestamp: convo.lastMessage.timestamp,
+    //         status: convo.lastMessage.status,
+    //       },
+    //       messages: convo.messages.map(msg => ({
+    //         _id: msg._id.toString(),
+    //         sender: msg.sender.toString(),
+    //         receiver: msg.receiver.toString(),
+    //         text: msg.text,
+    //         timestamp: msg.timestamp,
+    //         status: msg.status,
+    //       })),
+    //     };
+    //   });
 
-      sendToUser(userSockets, ws.userId, {
-        type: 'all_conversations',
-        conversations,
-      });
+    //   sendToUser(userSockets, ws.userId, {
+    //     type: 'all_conversations',
+    //     conversations,
+    //   });
 
-      break;
+    //   break;
+    // }
+case 'get_all_conversations': {
+  const allMessages = await Message.find({
+    $or: [
+      { sender: ws.userId },
+      { receiver: ws.userId }
+    ]
+  }).sort({ timestamp: 1 });
+
+  const conversationsMap = {};
+
+  allMessages.forEach(message => {
+    const otherUserId = message.sender.toString() === ws.userId
+      ? message.receiver.toString()
+      : message.sender.toString();
+
+    if (!conversationsMap[otherUserId]) {
+      conversationsMap[otherUserId] = {
+        messages: [],
+        unreadCount: 0,
+        lastMessage: null,
+      };
     }
-//     case 'get_all_conversations': {
-//   const allMessages = await Message.find({
-//     $or: [
-//       { sender: ws.userId },
-//       { receiver: ws.userId }
-//     ]
-//   }).sort({ timestamp: 1 });
 
-//   const conversationsMap = {};
+    conversationsMap[otherUserId].messages.push(message);
+    conversationsMap[otherUserId].lastMessage = message;
 
-//   allMessages.forEach(message => {
-//     const otherUserId = message.sender.toString() === ws.userId ? message.receiver.toString() : message.sender.toString();
+    if (
+      message.receiver.toString() === ws.userId &&
+      message.status !== 'seen'
+    ) {
+      conversationsMap[otherUserId].unreadCount++;
+    }
+  });
 
-//     if (!conversationsMap[otherUserId]) {
-//       conversationsMap[otherUserId] = {
-//         messages: [],
-//         unreadCount: 0,
-//         lastMessage: null,
-//       };
-//     }
+  const otherUserIds = Object.keys(conversationsMap);
 
-//     conversationsMap[otherUserId].messages.push(message);
-//     conversationsMap[otherUserId].lastMessage = message;
+  const usersData = await User.find(
+    { _id: { $in: otherUserIds } },
+    'username avatarUrl status'
+  ).lean();
 
-//     if (
-//       message.receiver.toString() === ws.userId &&
-//       message.status !== 'seen'
-//     ) {
-//       conversationsMap[otherUserId].unreadCount++;
-//     }
-//   });
+  const usersMap = {};
+  usersData.forEach(user => {
+    const userIdStr = user._id.toString();
+    usersMap[userIdStr] = {
+      username: user.username,
+      avatarUrl: user.avatarUrl,
+      status: user.status, // إما 'online' أو 'offline' أو 'busy'
+    };
+  });
 
-//   // جلب بيانات المستخدمين دفعة واحدة
-//   const otherUserIds = Object.keys(conversationsMap);
+  const conversations = otherUserIds.map(userId => {
+    const convo = conversationsMap[userId];
+    const user = usersMap[userId] || {
+      username: 'Unknown',
+      avatarUrl: null,
+      status: 'offline',
+    };
 
-//   const usersData = await User.find({ _id: { $in: otherUserIds } }, 'username avatarUrl').lean();
+    return {
+      withUserId: userId,
+      withUsername: user.username,
+      withAvatarUrl: user.avatarUrl,
+      userStatus: user.status, // الحالة الفعلية
+      unreadCount: convo.unreadCount,
+      lastMessage: {
+        _id: convo.lastMessage._id.toString(),
+        sender: convo.lastMessage.sender.toString(),
+        receiver: convo.lastMessage.receiver.toString(),
+        text: convo.lastMessage.text,
+        timestamp: convo.lastMessage.timestamp,
+        status: convo.lastMessage.status,
+      },
+      messages: convo.messages.map(msg => ({
+        _id: msg._id.toString(),
+        sender: msg.sender.toString(),
+        receiver: msg.receiver.toString(),
+        text: msg.text,
+        timestamp: msg.timestamp,
+        status: msg.status,
+      })),
+    };
+  });
 
-//   // دالة وهمية ترجع حالة المستخدم من مصدر الحالة
-//   // استبدل هذه الدالة بمنطقك الحقيقي للحصول على الحالة
-//   function getUserStatus(userId) {
-//     // مثال: يمكن أن ترجع 'online' أو 'offline' أو 'busy'...
-//     // هذا مكان منطقك لاستدعاء خدمة الحالة أو قاعدة بيانات الحالة
-//     return globalUserStatusMap[userId] || 'offline';
-//   }
+  sendToUser(userSockets, ws.userId, {
+    type: 'all_conversations',
+    conversations,
+  });
 
-//   const usersMap = {};
-//   usersData.forEach(user => {
-//     usersMap[user._id.toString()] = user;
-//   });
+  break;
+}
+case 'block_user': {
+  const { targetUserId } = msg;
 
-//   const conversations = otherUserIds.map(userId => {
-//     const convo = conversationsMap[userId];
-//     const user = usersMap[userId] || { username: 'Unknown', avatarUrl: null };
-//     const status = getUserStatus(userId); // جلب حالة المستخدم
+  if (!targetUserId) return;
 
-//     return {
-//       withUserId: userId,
-//       withUsername: user.username,
-//       withAvatarUrl: user.avatarUrl,
-//       withStatus: status,  // تضمين حالة المستخدم هنا
-//       unreadCount: convo.unreadCount,
-//       lastMessage: {
-//         _id: convo.lastMessage._id.toString(),
-//         sender: convo.lastMessage.sender.toString(),
-//         receiver: convo.lastMessage.receiver.toString(),
-//         text: convo.lastMessage.text,
-//         timestamp: convo.lastMessage.timestamp,
-//         status: convo.lastMessage.status,
-//       },
-//       messages: convo.messages.map(msg => ({
-//         _id: msg._id.toString(),
-//         sender: msg.sender.toString(),
-//         receiver: msg.receiver.toString(),
-//         text: msg.text,
-//         timestamp: msg.timestamp,
-//         status: msg.status,
-//       })),
-//     };
-//   });
+  const user = await User.findById(ws.userId);
+  const targetUser = await User.findById(targetUserId);
 
-//   sendToUser(userSockets, ws.userId, {
-//     type: 'all_conversations',
-//     conversations,
-//   });
+  if (!user || !targetUser) {
+    sendToUser(userSockets, ws.userId, {
+      type: 'block_failed',
+      message: 'المستخدم غير موجود',
+    });
+    return;
+  }
 
-//   break;
-// }
+  // تحقق إذا المستخدم محظور مسبقاً
+  if (user.blockedUsers.includes(targetUserId)) {
+    sendToUser(userSockets, ws.userId, {
+      type: 'block_failed',
+      message: 'المستخدم محظور بالفعل',
+    });
+    return;
+  }
+
+  user.blockedUsers.push(targetUserId);
+  await user.save();
+
+  sendToUser(userSockets, ws.userId, {
+    type: 'user_blocked_successfully',
+    blockedUserId: targetUserId,
+  });
+
+  break;
+}
+
+case 'unblock_user': {
+  const { targetUserId } = msg;
+
+  if (!targetUserId) return;
+
+  const user = await User.findById(ws.userId);
+
+  if (!user) {
+    sendToUser(userSockets, ws.userId, {
+      type: 'unblock_failed',
+      message: 'المستخدم غير موجود',
+    });
+    return;
+  }
+
+  // تحقق إذا المستخدم غير محظور أصلاً
+  if (!user.blockedUsers.includes(targetUserId)) {
+    sendToUser(userSockets, ws.userId, {
+      type: 'unblock_failed',
+      message: 'المستخدم غير محظور أصلاً',
+    });
+    return;
+  }
+
+  user.blockedUsers = user.blockedUsers.filter(
+    (blockedId) => blockedId.toString() !== targetUserId
+  );
+  await user.save();
+
+  sendToUser(userSockets, ws.userId, {
+    type: 'user_unblocked_successfully',
+    unblockedUserId: targetUserId,
+  });
+
+  break;
+}
+
+case 'get_blocked_users': {
+  const user = await User.findById(ws.userId);
+
+  if (!user) {
+    sendToUser(userSockets, ws.userId, {
+      type: 'get_blocked_users_failed',
+      message: 'المستخدم غير موجود',
+    });
+    return;
+  }
+
+  // جلب تفاصيل المستخدمين المحظورين (الاسم فقط)
+  const blockedUsersDetails = await User.find(
+    { _id: { $in: user.blockedUsers } },
+    { username: 1 }  // نطلب فقط حقل username مع _id افتراضياً
+  );
+
+  sendToUser(userSockets, ws.userId, {
+    type: 'blocked_users_list',
+    blockedUsers: blockedUsersDetails.map(u => ({
+      id: u._id,
+      name: u.username,
+    })),
+  });
+
+  break;
+}
 
 
   case 'get_friends':

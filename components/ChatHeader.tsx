@@ -10,28 +10,43 @@ import {
   Pressable,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import i18n from 'i18next'; // تأكد من إعداد i18n لديك
+import i18n from 'i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeMode } from '@/context/ThemeContext';
+import { useBlockUser } from '@/Hooks/useBlockUser';
+import Toast from 'react-native-toast-message';
 
 interface ChatHeaderProps {
   chatName: string;
+  userId: string;
   userStatus: 'online' | 'offline' | string;
   onBackPress: () => void;
-  onMenuPress?: () => void; // الآن غير مطلوب لأننا سنستخدم داخل المكون القائمة المنبثقة
-  onBlockPress: () => void; // دالة يتم تنفيذها عند الضغط على "بلوك"
 }
 
 const ChatHeader: React.FC<ChatHeaderProps> = ({
   chatName,
+  userId,
   userStatus,
   onBackPress,
-  onBlockPress,
 }) => {
   const { darkMode } = useThemeMode();
   const [language, setLanguage] = useState('en');
   const isRTL = language === 'ar';
   const [modalVisible, setModalVisible] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  console.log(isBlocked, 'isBlocked');
+
+  const {
+    blockUser,
+    unblockUser,
+    fetchBlockedUsers,
+    isUserBlocked,
+    blockedUsers,
+    loading,
+  } = useBlockUser();
+  useEffect(() => {
+    fetchBlockedUsers(); // سيتم تحميل قائمة المحظورين عند فتح شاشة المحادثة
+  }, []);
 
   useEffect(() => {
     const getStoredLang = async () => {
@@ -45,17 +60,43 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
     getStoredLang();
   }, []);
 
-  const openMenu = () => {
-    setModalVisible(true);
-  };
+  useEffect(() => {
+    const checkBlockStatus = async () => {
+      if (userId) {
+        const blocked = await isUserBlocked(userId);
+        setIsBlocked(blocked);
+      }
+    };
+    checkBlockStatus();
+  }, [userId, blockedUsers]);
 
-  const closeMenu = () => {
-    setModalVisible(false);
-  };
+  const openMenu = () => setModalVisible(true);
+  const closeMenu = () => setModalVisible(false);
 
-  const handleBlock = () => {
+  const handleBlock = async () => {
     closeMenu();
-    onBlockPress();
+    try {
+      if (isBlocked) {
+        await unblockUser(userId);
+        setIsBlocked(false);
+        Toast.show({
+          type: 'success',
+          text1: i18n.t('unblock_success') || 'تم إلغاء الحظر بنجاح',
+        });
+      } else {
+        await blockUser(userId);
+        setIsBlocked(true);
+        Toast.show({
+          type: 'success',
+          text1: i18n.t('block_success') || 'تم حظر المستخدم بنجاح',
+        });
+      }
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: i18n.t('action_failed') || 'فشل في تنفيذ العملية',
+      });
+    }
   };
 
   return (
@@ -108,15 +149,10 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           style={styles.iconButton}
           accessibilityLabel={i18n.t('menu') || 'Menu'}
         >
-          <Ionicons
-            name="menu"
-            size={28}
-            color={darkMode ? '#fff' : '#000'}
-          />
+          <Ionicons name="menu" size={28} color={darkMode ? '#fff' : '#000'} />
         </TouchableOpacity>
       </View>
 
-      {/* القائمة المنبثقة */}
       <Modal
         visible={modalVisible}
         transparent
@@ -125,14 +161,18 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
       >
         <Pressable style={styles.modalOverlay} onPress={closeMenu}>
           <View style={[styles.menuContainer, { backgroundColor: darkMode ? '#333' : '#fff' }]}>
-            <TouchableOpacity onPress={handleBlock} style={styles.menuItem}>
+            <TouchableOpacity onPress={handleBlock} style={styles.menuItem} disabled={loading}>
               <Text style={[styles.menuItemText, { color: darkMode ? '#fff' : '#000' }]}>
-                {i18n.t('block') || 'بلوك'}
+                {isBlocked
+                  ? i18n.t('unblock') || 'إلغاء الحظر'
+                  : i18n.t('block') || 'حظر'}
               </Text>
             </TouchableOpacity>
           </View>
         </Pressable>
       </Modal>
+
+      <Toast />
     </>
   );
 };

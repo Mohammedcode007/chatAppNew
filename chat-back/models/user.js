@@ -16,6 +16,8 @@ email: { type: String, unique: true, sparse: true, default: '' },
   gender: { type: String, enum: ['male', 'female', 'other'], default: 'male' },
   age: { type: Number, default: 18 },
   birthday: { type: Date, default: () => new Date('2000-01-01') },
+    verified: { type: Boolean, default: true },
+
   country: { type: String, default: 'Unknown' },
   views: { type: Number, default: 0 },
   messages: { type: Number, default: 0 },

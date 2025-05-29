@@ -13,6 +13,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { ActivityIndicator } from 'react-native';
+
 import AuthInput from '@/components/AuthInput';
 import { router } from 'expo-router';
 import { useThemeMode } from '@/context/ThemeContext';
@@ -125,9 +127,18 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
           />
           {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
 
-          <TouchableOpacity style={[styles.button, darkMode && styles.buttonDark]} onPress={handleLogin}>
-            <Text style={styles.buttonText}>{i18n.t('login')}</Text>
-          </TouchableOpacity>
+         <TouchableOpacity
+  style={[styles.button, darkMode && styles.buttonDark]}
+  onPress={handleLogin}
+  disabled={loading}  // تعطيل الزر أثناء التحميل
+>
+  {loading ? (
+    <ActivityIndicator color="#fff" />
+  ) : (
+    <Text style={styles.buttonText}>{i18n.t('login')}</Text>
+  )}
+</TouchableOpacity>
+
 
           <Text style={[styles.infoText, darkMode && styles.infoTextDark]}>
             {i18n.t('connectWithFriends')}

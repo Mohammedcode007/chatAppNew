@@ -27,6 +27,8 @@ import { useThemeMode } from '@/context/ThemeContext';
 import { useUserProfile } from '@/Hooks/useUserProfile';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUserStatus } from '@/Hooks/useUserStatus';
+import BlockedUsersModal from '@/components/BlockedUsersModal';
+import { useBlockUser } from '@/Hooks/useBlockUser';
 const windowWidth = Dimensions.get('window').width;
 
 
@@ -34,6 +36,7 @@ const windowWidth = Dimensions.get('window').width;
 export default function ProfileScreen() {
   const { darkMode, toggleDarkMode } = useThemeMode();
   const [userData, setUserData] = useState<any>(null);
+console.log(userData,'userData');
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -67,18 +70,18 @@ export default function ProfileScreen() {
 
 
   const [statusModalVisible, setStatusModalVisible] = useState(false);
-const [selectedStatus, setSelectedStatus] = useState<'online' | 'offline'>('offline');
+  const [selectedStatus, setSelectedStatus] = useState<'online' | 'offline'>('offline');
 
 
 
   // فتح المودال مع تهيئة البيانات حسب نوع الحقل
   const openEditModal = (key: string, currentValue: string) => {
     setCurrentEditKey(key);
-if (key === 'status') {
-  setSelectedStatus(currentValue === 'online' ? 'online' : 'offline');
-  setStatusModalVisible(true); // نفتح مودال الحالة فقط
-  return;
-}
+    if (key === 'status') {
+      setSelectedStatus(currentValue === 'online' ? 'online' : 'offline');
+      setStatusModalVisible(true); // نفتح مودال الحالة فقط
+      return;
+    }
     if (key === 'birthday') {
       const dateParts = currentValue.split('-');
       if (dateParts.length === 3) {
@@ -211,6 +214,35 @@ if (key === 'status') {
     pickImage('cover');
   };
 
+   const {
+      blockUser,
+      unblockUser,
+      fetchBlockedUsers,
+      isUserBlocked,
+      blockedUsers,
+    } = useBlockUser();
+    useEffect(() => {
+      fetchBlockedUsers(); // سيتم تحميل قائمة المحظورين عند فتح شاشة المحادثة
+    }, []);
+    const [blockedList, setBlockedList] = useState<{ id: string; name: string }[]>([]);
+
+    useEffect(() => {
+  if (blockedUsers && Array.isArray(blockedUsers)) {
+    const transformed = blockedUsers.map((user) => ({
+      id: user.id,
+      name: user.name,
+    }));
+    setBlockedList(transformed);
+  }
+}, [blockedUsers]);
+  const [modalVisibleBlock, setModalVisibleBlock] = useState(false); 
+
+
+ const handleUnblock = (userId: string) => {
+  setBlockedList((prev) => prev.filter((user) => user.id !== userId));
+  unblockUser(userId); // استدعاء دالة رفع الحظر
+};
+
   if (!userData) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
@@ -288,6 +320,10 @@ if (key === 'status') {
             </TouchableOpacity>
             <TouchableOpacity style={[styles.messageButton, { backgroundColor: theme.card }]}>
               <Text style={{ color: theme.text }}>Message</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setModalVisibleBlock(true)}
+              style={[styles.messageButton, { backgroundColor: theme.card }]}>
+              <Text style={{ color: theme.text }}>Blocked</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -417,43 +453,49 @@ if (key === 'status') {
           </View>
         </Modal>
         <Modal visible={statusModalVisible} transparent animationType="slide">
-  <View style={styles.modalOverlay}>
-    <View style={[styles.modalContent, { backgroundColor: theme.bg }]}>
-      <Text style={[styles.modalTitle, { color: theme.text }]}>اختر حالتك</Text>
-      <Picker
-        selectedValue={selectedStatus}
-        onValueChange={(itemValue) => setSelectedStatus(itemValue)}
-        style={{ color: theme.text }}
-      >
-        <Picker.Item label="متصل (online)" value="online" />
-        <Picker.Item label="غير متصل (offline)" value="offline" />
-      </Picker>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: theme.bg }]}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>اختر حالتك</Text>
+              <Picker
+                selectedValue={selectedStatus}
+                onValueChange={(itemValue) => setSelectedStatus(itemValue)}
+                style={{ color: theme.text }}
+              >
+                <Picker.Item label="متصل (online)" value="online" />
+                <Picker.Item label="غير متصل (offline)" value="offline" />
+              </Picker>
 
-      <View style={styles.modalButtons}>
-        <TouchableOpacity onPress={() => setStatusModalVisible(false)}>
-          <Text style={[styles.cancelButton, { color: 'red' }]}>إلغاء</Text>
-        </TouchableOpacity>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity onPress={() => setStatusModalVisible(false)}>
+                  <Text style={[styles.cancelButton, { color: 'red' }]}>إلغاء</Text>
+                </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => {
-            setUserData((prev: any) => {
-              const updated = { ...prev, status: selectedStatus };
-              if (!token) {
-                Alert.alert('خطأ', 'التوكن غير موجود');
-                return prev;
-              }
-              updateStatus(selectedStatus, token);
-              return updated;
-            });
-            setStatusModalVisible(false);
-          }}
-        >
-          <Text style={[styles.saveButton, { color: theme.text }]}>حفظ</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </View>
-</Modal>
+                <TouchableOpacity
+                  onPress={() => {
+                    setUserData((prev: any) => {
+                      const updated = { ...prev, status: selectedStatus };
+                      if (!token) {
+                        Alert.alert('خطأ', 'التوكن غير موجود');
+                        return prev;
+                      }
+                      updateStatus(selectedStatus, token);
+                      return updated;
+                    });
+                    setStatusModalVisible(false);
+                  }}
+                >
+                  <Text style={[styles.saveButton, { color: theme.text }]}>حفظ</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+        <BlockedUsersModal
+          visible={modalVisibleBlock}
+          onClose={() => setModalVisibleBlock(false)}
+          blockedUsers={blockedList}
+          onUnblock={handleUnblock}
+          theme={theme}  />
 
       </ScrollView>
     </SafeAreaView>
@@ -558,7 +600,7 @@ const styles = StyleSheet.create({
     marginTop: 15,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: '60%',
+    width: '100%',
   },
   followButton: {
     paddingVertical: 8,
@@ -636,34 +678,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalOverlay: {
-  flex: 1,
-  backgroundColor: 'rgba(0,0,0,0.5)',
-  justifyContent: 'center',
-  alignItems: 'center',
-},
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
-modalContent: {
-  width: '85%',
-  borderRadius: 12,
-  padding: 20,
-},
+  modalContent: {
+    width: '85%',
+    borderRadius: 12,
+    padding: 20,
+  },
 
 
 
-modalButtons: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  marginTop: 20,
-},
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
 
-cancelButton: {
-  fontSize: 16,
-},
+  cancelButton: {
+    fontSize: 16,
+  },
 
-saveButton: {
-  fontSize: 16,
-  fontWeight: 'bold',
-},
+  saveButton: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 
 });
 

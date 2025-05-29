@@ -11,6 +11,8 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   KeyboardEvent,
+  Alert,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useNavigation } from "expo-router";
@@ -20,8 +22,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Audio } from "expo-av";
 import ChatHeader from "@/components/ChatHeader";
+import * as Clipboard from 'expo-clipboard';
 
 interface Message {
+  replyTo?: Message;  // الآن اختيارية
   _id: string;
   text: string;
   sender: string;
@@ -39,11 +43,11 @@ interface ChatScreenProps {
   onMenuPress: () => void;
 }
 export default function ChatScreen() {
-const { userId, name, status } = useLocalSearchParams<{
-  userId: string;
-  name?: string;
-  status?: string;
-}>();  const { darkMode } = useThemeMode();
+  const { userId, name, status } = useLocalSearchParams<{
+    userId: string;
+    name?: string;
+    status?: string;
+  }>(); const { darkMode } = useThemeMode();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
 
@@ -59,6 +63,9 @@ const { userId, name, status } = useLocalSearchParams<{
   const [userData, setUserData] = useState<any>(null);
   const flatListRef = useRef<FlatList<Message> | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [reactions, setReactions] = useState<Record<string, string[]>>({});
+  const reactionsList = ["👍", "❤️", "😂", "😮", "😢", "👏"];
 
   const loadSound = async () => {
     try {
@@ -116,11 +123,11 @@ const { userId, name, status } = useLocalSearchParams<{
     fetchUserData();
   }, []);
 
- useEffect(() => {
-  navigation.setOptions({
-    headerShown: false,
-  });
-}, []);
+  useEffect(() => {
+    navigation.setOptions({
+      headerShown: false,
+    });
+  }, []);
 
 
   const scrollToEnd = () => {
@@ -163,7 +170,9 @@ const { userId, name, status } = useLocalSearchParams<{
     };
 
     return (
-      <View
+      <TouchableOpacity
+      onLongPress={() => setSelectedMessage(item)}
+  activeOpacity={0.7}
         style={[
           styles.messageContainer,
           { justifyContent: isMyMessage ? "flex-end" : "flex-start" },
@@ -186,6 +195,19 @@ const { userId, name, status } = useLocalSearchParams<{
             },
           ]}
         >
+          {item.replyTo && (
+            <View style={{
+              backgroundColor: darkMode ? "#555" : "#ddd",
+              padding: 6,
+              borderRadius: 8,
+              marginBottom: 4,
+            }}>
+              <Text style={{ fontStyle: "italic", color: darkMode ? "#eee" : "#333" }}>
+                رد على: {item.replyTo.text}
+              </Text>
+            </View>
+          )}
+
           <Text
             style={[
               styles.messageText,
@@ -210,10 +232,20 @@ const { userId, name, status } = useLocalSearchParams<{
             >
               {formatTime(item.timestamp)}
             </Text>
+            {reactions[item._id] && reactions[item._id].length > 0 && (
+              <View style={{ flexDirection: "row", marginTop: 4 }}>
+                {reactions[item._id].map((reaction, idx) => (
+                  <Text key={idx} style={{ marginRight: 6, fontSize: 16 }}>
+                    {reaction}
+                  </Text>
+                ))}
+              </View>
+            )}
+
             {isMyMessage && <View style={{ marginLeft: 4 }}>{getStatusIcon(item.status)}</View>}
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -248,9 +280,8 @@ const { userId, name, status } = useLocalSearchParams<{
         chatName={name?.toString() ?? "اسم افتراضي"}
         userStatus={status?.toString() ?? " حاله افتراضيه"}
         onBackPress={onBackPress}
-        onMenuPress={onMenuPress} onBlockPress={function (): void {
-          throw new Error("Function not implemented.");
-        } }      />
+        userId={userId}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
@@ -294,6 +325,108 @@ const { userId, name, status } = useLocalSearchParams<{
           </View>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
+      {/* قائمة خيارات التفاعل */}
+      <Modal
+        visible={!!selectedMessage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedMessage(null)}
+      >
+        <TouchableWithoutFeedback onPress={() => setSelectedMessage(null)}>
+          <View style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.4)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}>
+            <View style={{
+              backgroundColor: darkMode ? "#333" : "#fff",
+              borderRadius: 12,
+              padding: 16,
+              width: "100%",
+              maxWidth: 300,
+            }}>
+              <Text style={{
+                fontSize: 16,
+                fontWeight: "bold",
+                marginBottom: 12,
+                color: darkMode ? "#fff" : "#000",
+                textAlign: "center",
+              }}>
+                اختر خياراً
+              </Text>
+
+              {/* زر الرد */}
+              <TouchableOpacity
+                style={{ paddingVertical: 10 }}
+                onPress={() => {
+                  setNewMessage(`@${selectedMessage?.sender}: `);
+                  setSelectedMessage(null);
+                }}
+              >
+                <Text style={{ fontSize: 16, color: "#007aff", textAlign: "center" }}>
+                  رد على الرسالة
+                </Text>
+              </TouchableOpacity>
+
+              {/* قائمة ردود الفعل */}
+              <View style={{ flexDirection: "row", justifyContent: "center", marginVertical: 12 }}>
+                {reactionsList.map((reaction) => (
+                  <TouchableOpacity
+                    key={reaction}
+                    style={{ marginHorizontal: 6 }}
+                    onPress={() => {
+                      if (!selectedMessage) return;
+                      const msgId = selectedMessage._id;
+                      setReactions((prev) => {
+                        const currentReactions = prev[msgId] || [];
+                        return {
+                          ...prev,
+                          [msgId]: currentReactions.includes(reaction)
+                            ? currentReactions.filter(r => r !== reaction)
+                            : [...currentReactions, reaction],
+                        };
+                      });
+                      setSelectedMessage(null);
+                    }}
+                  >
+                    <Text style={{ fontSize: 24 }}>{reaction}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* زر النسخ */}
+              <TouchableOpacity
+                style={{ paddingVertical: 10 }}
+                onPress={async () => {
+                  if (selectedMessage) {
+                    await Clipboard.setStringAsync(selectedMessage.text);
+
+                    Alert.alert("تم النسخ", "تم نسخ نص الرسالة إلى الحافظة");
+                    setSelectedMessage(null);
+                  }
+                }}
+
+              >
+                <Text style={{ fontSize: 16, color: "#007aff", textAlign: "center" }}>
+                  نسخ نص الرسالة
+                </Text>
+              </TouchableOpacity>
+
+              {/* زر إلغاء */}
+              <TouchableOpacity
+                style={{ paddingVertical: 10 }}
+                onPress={() => setSelectedMessage(null)}
+              >
+                <Text style={{ fontSize: 16, color: darkMode ? "#aaa" : "#555", textAlign: "center" }}>
+                  إلغاء
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </SafeAreaView>
   );
 }

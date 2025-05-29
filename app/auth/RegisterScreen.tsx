@@ -14,6 +14,8 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import { ActivityIndicator } from 'react-native';
+
 import AuthInput from '@/components/AuthInput';
 import { router } from 'expo-router';
 import { useThemeMode } from '@/context/ThemeContext';
@@ -27,6 +29,7 @@ export default function RegisterScreen({ navigation }: { navigation: any }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const [errors, setErrors] = useState({
     username: '',
@@ -87,16 +90,24 @@ export default function RegisterScreen({ navigation }: { navigation: any }) {
 
     if (!valid) return;
 
-    // استدعاء الدالة لإرسال البيانات للسيرفر
-    const result = await registerUser(username, password, email);
+    try {
+      setLoading(true); // تفعيل التحميل
+      const result = await registerUser(username, password, email);
 
-    if (result.success) {
-      Alert.alert(i18n.t('register.successTitle'), i18n.t('register.successMessage'));
-      router.push('/auth/LoginScreen'); // الانتقال لشاشة تسجيل الدخول بعد النجاح
-    } else {
-      Alert.alert(i18n.t('register.failedTitle'), result.message || i18n.t('register.failedMessage'));
+      if (result.success) {
+        Alert.alert(i18n.t('register.successTitle'), i18n.t('register.successMessage'));
+        router.push('/auth/LoginScreen');
+      } else {
+        Alert.alert(i18n.t('register.failedTitle'), result.message || i18n.t('register.failedMessage'));
+      }
+    } catch (error) {
+      console.error('Registration Error:', error);
+      Alert.alert(i18n.t('register.failedTitle'), i18n.t('register.failedMessage'));
+    } finally {
+      setLoading(false); // إيقاف التحميل
     }
   };
+
 
   const dynamicStyles = getStyles(darkMode, isRTL);
 
@@ -149,10 +160,18 @@ export default function RegisterScreen({ navigation }: { navigation: any }) {
             textAlign={isRTL ? 'right' : 'left'}
           />
           {errors.email ? <Text style={dynamicStyles.errorText}>{errors.email}</Text> : null}
-
-          <TouchableOpacity style={dynamicStyles.button} onPress={handleRegister}>
-            <Text style={dynamicStyles.buttonText}>{i18n.t('register.register')}</Text>
+          <TouchableOpacity
+            style={dynamicStyles.button} onPress={handleRegister}
+            disabled={loading}  // تعطيل الزر أثناء التحميل
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={dynamicStyles.buttonText}>{i18n.t('register.register')}</Text>
+            )}
           </TouchableOpacity>
+
+
 
           <Text style={dynamicStyles.infoText}>{i18n.t('register.info1')}</Text>
           <Text style={dynamicStyles.infoText}>{i18n.t('register.info2')}</Text>
