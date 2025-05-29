@@ -26,11 +26,15 @@
     "register": "Register",
     "info1": "Enjoy chatting with your friends anytime, anywhere.",
     "info2": "Secure and fast communication across the globe.",
-    "loginHere": "Already have an account? Login here"
+    "loginHere": "Already have an account? Login here",
+        "email": "Email"
+
   },
   "errors": {
     "usernameRequired": "Username is required",
     "passwordRequired": "Password is required",
-    "phoneRequired": "Phone number is required"
+    "phoneRequired": "Phone number is required",
+        "emailRequired": "Email is required",
+    "emailInvalid": "Invalid email address"
   }
 }

@@ -8,7 +8,6 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  SafeAreaView,
   TouchableWithoutFeedback,
   Keyboard,
   KeyboardEvent,
@@ -18,7 +17,9 @@ import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useThemeMode } from "@/context/ThemeContext";
 import { useConversation } from "@/Hooks/useConversation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Audio } from "expo-av";
+import ChatHeader from "@/components/ChatHeader";
 
 interface Message {
   _id: string;
@@ -29,9 +30,20 @@ interface Message {
   status: "sent" | "delivered" | "received" | "seen";
 }
 
+interface ChatScreenProps {
+  chatName: string;
+  userStatus: 'online' | 'offline' | string;
+  currentUserId: string;
+  messages: Message[];
+  onBackPress: () => void;
+  onMenuPress: () => void;
+}
 export default function ChatScreen() {
-  const { userId, name } = useLocalSearchParams<{ userId: string; name?: string }>();
-  const { darkMode } = useThemeMode();
+const { userId, name, status } = useLocalSearchParams<{
+  userId: string;
+  name?: string;
+  status?: string;
+}>();  const { darkMode } = useThemeMode();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
 
@@ -46,15 +58,48 @@ export default function ChatScreen() {
 
   const [userData, setUserData] = useState<any>(null);
   const flatListRef = useRef<FlatList<Message> | null>(null);
-  useEffect(() => {
-  openChat();
-  console.log("ChatScreen mounted - openChat called");
+  const soundRef = useRef<Audio.Sound | null>(null);
 
-  return () => {
-    closeChat();
-    console.log("ChatScreen unmounted - closeChat called, user left chat");
+  const loadSound = async () => {
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        require("@/assets/sound/notiy-pvt.mp3")
+      );
+      soundRef.current = sound;
+    } catch (error) {
+      console.error("Failed to load sound", error);
+    }
   };
-}, []);
+
+  useEffect(() => {
+    loadSound();
+
+    return () => {
+      soundRef.current?.unloadAsync();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (messages.length === 0 || !userData?._id) return;
+
+    const lastMessage = messages[messages.length - 1];
+    // soundRef.current?.replayAsync();
+
+    // لو كانت آخر رسالة واردة وليست مرسلة من المستخدم الحالي
+    if (lastMessage.sender !== userData._id) {
+      soundRef.current?.replayAsync();
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    openChat();
+    console.log("ChatScreen mounted - openChat called");
+
+    return () => {
+      closeChat();
+      console.log("ChatScreen unmounted - closeChat called, user left chat");
+    };
+  }, []);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -71,9 +116,12 @@ export default function ChatScreen() {
     fetchUserData();
   }, []);
 
-  useEffect(() => {
-    navigation.setOptions({ title: name || "الدردشة" });
-  }, [name]);
+ useEffect(() => {
+  navigation.setOptions({
+    headerShown: false,
+  });
+}, []);
+
 
   const scrollToEnd = () => {
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
@@ -121,6 +169,7 @@ export default function ChatScreen() {
           { justifyContent: isMyMessage ? "flex-end" : "flex-start" },
         ]}
       >
+
         <View
           style={[
             styles.messageBubble,
@@ -185,8 +234,23 @@ export default function ChatScreen() {
     };
   }, []);
 
+  function onMenuPress(): void {
+    throw new Error("Function not implemented.");
+  }
+
+  const onBackPress = () => {
+    navigation.goBack();
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: darkMode ? "#000" : "#fff" }}>
+      <ChatHeader
+        chatName={name?.toString() ?? "اسم افتراضي"}
+        userStatus={status?.toString() ?? " حاله افتراضيه"}
+        onBackPress={onBackPress}
+        onMenuPress={onMenuPress} onBlockPress={function (): void {
+          throw new Error("Function not implemented.");
+        } }      />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}

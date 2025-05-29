@@ -6,12 +6,16 @@ exports.signup = async (req, res) => {
   const { username, password, email } = req.body;  // استقبال البريد مع باقي البيانات
   try {
     // التحقق إذا كان اسم المستخدم موجود مسبقاً
-    const existing = await User.findOne({ username });
-    if (existing) return res.status(400).json({ message: 'Username already exists' });
+    const existingUser = await User.findOne({ username });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Username already exists' });
+    }
 
-    // يمكنك إضافة تحقق اختياري من البريد إذا أردت
-    // const existingEmail = await User.findOne({ email });
-    // if (existingEmail) return res.status(400).json({ message: 'Email already exists' });
+    // التحقق إذا كان البريد الإلكتروني موجود مسبقاً
+    const existingEmail = await User.findOne({ email });
+    if (existingEmail) {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
 
     // تشفير كلمة المرور
     const hashed = await bcrypt.hash(password, 10);
@@ -20,7 +24,7 @@ exports.signup = async (req, res) => {
     const user = new User({
       username,
       password: hashed,
-      email: email || '',      // إذا لم يُرسل البريد، نضع قيمة فارغة أو null حسب تعريف السكيما
+      email: email || '',  // حسب تعريف السكيما، يمكنك جعله مطلوبًا بدل القيمة الفارغة
       status: 'offline',
       friends: [],
     });
@@ -29,13 +33,14 @@ exports.signup = async (req, res) => {
     await user.save();
 
     // إرسال رد بنجاح التسجيل
-    res.json({ message: 'User registered successfully' });
+    res.status(201).json({ message: 'User registered successfully', user });
 
   } catch (err) {
     console.error('Signup error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
+
 
 exports.login = async (req, res) => {
   const { username, password } = req.body;

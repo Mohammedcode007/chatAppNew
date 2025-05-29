@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { I18nManager } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import i18n from 'i18next';  // تأكد من أنك مهيئ i18n في مشروعك
+import axios from 'axios';
 import {
   View,
   Text,
@@ -11,25 +12,26 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import AuthInput from '@/components/AuthInput';
 import { router } from 'expo-router';
-import CountryPicker, { Country, CountryCode } from 'react-native-country-picker-modal';
 import { useThemeMode } from '@/context/ThemeContext';
+import { registerUser } from '@/services/auth';
 
 const { height } = Dimensions.get('window');
+
+
 
 export default function RegisterScreen({ navigation }: { navigation: any }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [countryCode, setCountryCode] = useState<CountryCode>('EG');
-  const [callingCode, setCallingCode] = useState('20');
+  const [email, setEmail] = useState('');
 
   const [errors, setErrors] = useState({
     username: '',
     password: '',
-    phone: '',
+    email: '',
   });
 
   const { darkMode } = useThemeMode();
@@ -54,30 +56,46 @@ export default function RegisterScreen({ navigation }: { navigation: any }) {
 
   const isRTL = language === 'ar';
 
-  const handleRegister = () => {
-    let tempErrors = { username: '', password: '', phone: '' };
+  const validateEmail = (email: string) => {
+    const regex = /^\S+@\S+\.\S+$/;
+    return regex.test(email);
+  };
+
+  const handleRegister = async () => {
+    let tempErrors = { username: '', password: '', email: '' };
     let valid = true;
 
-    if (!username) { tempErrors.username = i18n.t('errors.usernameRequired'); valid = false; }
-    if (!password) { tempErrors.password = i18n.t('errors.passwordRequired'); valid = false; }
-    if (!phone) { tempErrors.phone = i18n.t('errors.phoneRequired'); valid = false; }
+    if (!username) {
+      tempErrors.username = i18n.t('errors.usernameRequired');
+      valid = false;
+    }
+
+    if (!password) {
+      tempErrors.password = i18n.t('errors.passwordRequired');
+      valid = false;
+    }
+
+    if (!email) {
+      tempErrors.email = i18n.t('errors.emailRequired');
+      valid = false;
+    } else if (!validateEmail(email)) {
+      tempErrors.email = i18n.t('errors.emailInvalid');
+      valid = false;
+    }
 
     setErrors(tempErrors);
 
     if (!valid) return;
 
-    console.log('Registering:', {
-      username, password, phone: `+${callingCode}${phone}`
-    });
-  };
+    // استدعاء الدالة لإرسال البيانات للسيرفر
+    const result = await registerUser(username, password, email);
 
-  const handleSelectCountry = (country: Country) => {
-    setCountryCode(country.cca2);
-    setCallingCode(country.callingCode[0] || '');
-  };
-
-  const handleNavigateToLogin = () => {
-    router.push('/auth/LoginScreen');
+    if (result.success) {
+      Alert.alert(i18n.t('register.successTitle'), i18n.t('register.successMessage'));
+      router.push('/auth/LoginScreen'); // الانتقال لشاشة تسجيل الدخول بعد النجاح
+    } else {
+      Alert.alert(i18n.t('register.failedTitle'), result.message || i18n.t('register.failedMessage'));
+    }
   };
 
   const dynamicStyles = getStyles(darkMode, isRTL);
@@ -120,28 +138,17 @@ export default function RegisterScreen({ navigation }: { navigation: any }) {
           />
           {errors.password ? <Text style={dynamicStyles.errorText}>{errors.password}</Text> : null}
 
-          <View style={dynamicStyles.countryPickerContainer}>
-            <CountryPicker
-              withFilter
-              withFlag
-              withCallingCode
-              withEmoji
-              countryCode={countryCode}
-              onSelect={handleSelectCountry}
-              containerButtonStyle={dynamicStyles.countryButton}
-            />
-            <Text style={dynamicStyles.callingCode}>+{callingCode}</Text>
-          </View>
           <AuthInput
-            placeholder={i18n.t('register.phoneNumber')}
-            value={phone}
-            onChangeText={setPhone}
-            iconName="call-outline"
-            keyboardType="phone-pad"
+            placeholder={i18n.t('register.email')}
+            value={email}
             darkMode={darkMode}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            iconName="mail-outline"
+            autoCapitalize="none"
             textAlign={isRTL ? 'right' : 'left'}
           />
-          {errors.phone ? <Text style={dynamicStyles.errorText}>{errors.phone}</Text> : null}
+          {errors.email ? <Text style={dynamicStyles.errorText}>{errors.email}</Text> : null}
 
           <TouchableOpacity style={dynamicStyles.button} onPress={handleRegister}>
             <Text style={dynamicStyles.buttonText}>{i18n.t('register.register')}</Text>
@@ -150,7 +157,7 @@ export default function RegisterScreen({ navigation }: { navigation: any }) {
           <Text style={dynamicStyles.infoText}>{i18n.t('register.info1')}</Text>
           <Text style={dynamicStyles.infoText}>{i18n.t('register.info2')}</Text>
 
-          <TouchableOpacity onPress={handleNavigateToLogin}>
+          <TouchableOpacity onPress={() => router.push('/auth/LoginScreen')}>
             <Text style={dynamicStyles.registerText}>{i18n.t('register.loginHere')}</Text>
           </TouchableOpacity>
         </View>
@@ -183,21 +190,6 @@ const getStyles = (darkMode: boolean, isRTL: boolean) =>
       color: darkMode ? '#fff' : '#491B6D',
       marginBottom: 30,
       textAlign: 'center',
-      writingDirection: isRTL ? 'rtl' : 'ltr',
-    },
-    countryPickerContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 10,
-      marginLeft: 8,
-      justifyContent: isRTL ? 'flex-end' : 'flex-start',
-    },
-    countryButton: {
-      marginRight: 10,
-    },
-    callingCode: {
-      fontSize: 16,
-      color: darkMode ? '#fff' : '#000',
       writingDirection: isRTL ? 'rtl' : 'ltr',
     },
     button: {

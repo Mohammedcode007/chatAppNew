@@ -8,65 +8,49 @@ import CustomHeader from '@/components/CustomHeader';
 import { useThemeMode } from '@/context/ThemeContext';
 import { useFriendStatuses } from '@/Hooks/useFriendStatuses';
 import { useRouter } from 'expo-router';
+import { useAllFriends } from '@/Hooks/useAllFriends';
 
 type Friend = {
   _id: string;
   username: string;
-  status: string;
-  avatar?: string;  // افتراضياً يمكن تضيف خاصية صورة الافاتار لو موجودة في بياناتك
-  isOnline: boolean;
+  status?: string | undefined;
+  avatar?: string;
 };
+
 
 const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 export default function Friends() {
   const { darkMode } = useThemeMode();
   const user = useSelector((state: RootState) => state.user);
-  const { friendStatuses } = useFriendStatuses();
+const { friends, loading, refreshFriends } = useAllFriends();
 
-  console.log(friendStatuses, "friendStatuses");
+  console.log(friends, "friendStatuses");
 
-  const [friends, setFriends] = useState<Friend[]>([]);
   const [searchText, setSearchText] = useState('');
   const flatListRef = useRef<FlatList>(null);
   const router = useRouter();
 
   const language = 'ar';
   const isRTL = language === 'ar';
-  useEffect(() => {
-    if (user && user.userData && user.userData.friends) {
-      const friendsList = user.userData.friends.map((f: any) => ({
-        _id: f._id,
-        username: f.username,
-        status: f.status || '',
-        avatar: `https://randomuser.me/api/portraits/men/${Math.floor(Math.random() * 100)}.jpg`,
-        isOnline: friendStatuses[f._id] === 'online',
-      }));
 
-      const sortedFriends = friendsList.sort((a, b) => a.username.localeCompare(b.username));
-      setFriends(sortedFriends);
-    }
-  }, [user, friendStatuses]); // لاحظ إضافة friendStatuses هنا
 
-  // useEffect(() => {
-  //   if (user && user.userData && user.userData.friends) {
-  //     // تحويل بيانات الأصدقاء من الـ Redux إلى الصيغة المطلوبة، وترتيب أبجدي
-  //     const friendsList = user.userData.friends.map((f: any) => ({
-  //       _id: f._id,
-  //       username: f.username,
-  //       status: f.status || '',
-  //       avatar: `https://randomuser.me/api/portraits/men/${Math.floor(Math.random() * 100)}.jpg`, // مثال صورة عشوائية مؤقتة
-  //       isOnline: f.status === 'online',
-  //     }));
-
-  //     const sortedFriends = friendsList.sort((a, b) => a.username.localeCompare(b.username));
-  //     setFriends(sortedFriends);
-  //   }
-  // }, [user]);
-
-  const filteredFriends = friends.filter(friend =>
+const filteredFriends = friends
+  .filter(friend =>
     friend.username.toLowerCase().includes(searchText.toLowerCase())
-  );
+  )
+  .sort((a, b) => {
+    // أولًا حسب الحالة: الأصدقاء "online" يظهرون أولًا
+    if (a.status === "online" && b.status !== "online") {
+      return -1;
+    }
+    if (a.status !== "online" && b.status === "online") {
+      return 1;
+    }
+    // ثانيًا حسب الترتيب الأبجدي حسب الاسم
+    return a.username.localeCompare(b.username, language);
+  });
+
   console.log(filteredFriends, '787987987');
 
 
@@ -88,14 +72,15 @@ export default function Friends() {
 
   const renderFriend = ({ item }: { item: Friend }) => (
     <TouchableOpacity style={[styles.friendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-      onPress={() => router.push(`/chat/${item._id}?name=${encodeURIComponent(item.username)}`)}
+      onPress={() => router.push(    `/chat/${item._id}?name=${encodeURIComponent(item.username)}&status=${item.status}`
+)}
     >
       <View style={styles.avatarContainer}>
         <Image source={{ uri: item.avatar }} style={styles.avatar} />
         <View
           style={[
             styles.onlineIndicator,
-            { backgroundColor: item.isOnline || item.status ===  "online"? 'green' : 'gray' },
+            { backgroundColor:  item.status ===  "online"? 'green' : 'gray' },
           ]}
         />
       </View>
@@ -110,7 +95,7 @@ export default function Friends() {
         ]}
       >
         <Text style={[styles.friendName, { color: darkMode ? '#fff' : '#000' }]}>{item.username}</Text>
-        <Text style={[styles.statusMessage, { color: darkMode ? '#aaa' : '#666' }]}>{item.status}</Text>
+        <Text style={[styles.statusMessage, { color: darkMode ? '#aaa' : '#666' }]}>{item.status === "online" ? "Online" : "Offline"}</Text>
       </View>
     </TouchableOpacity>
   );

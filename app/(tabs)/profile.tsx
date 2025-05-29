@@ -29,27 +29,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUserStatus } from '@/Hooks/useUserStatus';
 const windowWidth = Dimensions.get('window').width;
 
-const user = {
-  name: 'Ilja Miskov',
-  avatar: 'https://i.pravatar.cc/150?img=12',
-  cover: 'https://i.pinimg.com/736x/17/1a/6c/171a6c7b6bce25e1664c0d7315251e46.jpg',
-  verified: true,
-  posts: 291,
-  followers: 6188,
-  following: 793,
-  country: 'Germany',
-  views: 10245,
-  messages: 230,
-  email: 'ilja@example.com',
-  phone: '+49 123 456 7890',
-  gender: 'Male',
-  birthday: '1991-07-12',
-  images: [
-    'https://i.pinimg.com/736x/14/a3/ce/14a3cea0fcf7323a0d84923846c56af2.jpg',
-    'https://i.pinimg.com/736x/14/a3/ce/14a3cea0fcf7323a0d84923846c56af2.jpg',
-    'https://i.pinimg.com/736x/14/a3/ce/14a3cea0fcf7323a0d84923846c56af2.jpg',
-  ],
-};
+
 
 export default function ProfileScreen() {
   const { darkMode, toggleDarkMode } = useThemeMode();
@@ -84,13 +64,21 @@ export default function ProfileScreen() {
   const [dateValue, setDateValue] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const { profile, updateProfile, notifications } = useUserProfile();
-  console.log(userData);
+
+
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+const [selectedStatus, setSelectedStatus] = useState<'online' | 'offline'>('offline');
+
 
 
   // فتح المودال مع تهيئة البيانات حسب نوع الحقل
   const openEditModal = (key: string, currentValue: string) => {
     setCurrentEditKey(key);
-
+if (key === 'status') {
+  setSelectedStatus(currentValue === 'online' ? 'online' : 'offline');
+  setStatusModalVisible(true); // نفتح مودال الحالة فقط
+  return;
+}
     if (key === 'birthday') {
       const dateParts = currentValue.split('-');
       if (dateParts.length === 3) {
@@ -428,6 +416,45 @@ export default function ProfileScreen() {
             </View>
           </View>
         </Modal>
+        <Modal visible={statusModalVisible} transparent animationType="slide">
+  <View style={styles.modalOverlay}>
+    <View style={[styles.modalContent, { backgroundColor: theme.bg }]}>
+      <Text style={[styles.modalTitle, { color: theme.text }]}>اختر حالتك</Text>
+      <Picker
+        selectedValue={selectedStatus}
+        onValueChange={(itemValue) => setSelectedStatus(itemValue)}
+        style={{ color: theme.text }}
+      >
+        <Picker.Item label="متصل (online)" value="online" />
+        <Picker.Item label="غير متصل (offline)" value="offline" />
+      </Picker>
+
+      <View style={styles.modalButtons}>
+        <TouchableOpacity onPress={() => setStatusModalVisible(false)}>
+          <Text style={[styles.cancelButton, { color: 'red' }]}>إلغاء</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => {
+            setUserData((prev: any) => {
+              const updated = { ...prev, status: selectedStatus };
+              if (!token) {
+                Alert.alert('خطأ', 'التوكن غير موجود');
+                return prev;
+              }
+              updateStatus(selectedStatus, token);
+              return updated;
+            });
+            setStatusModalVisible(false);
+          }}
+        >
+          <Text style={[styles.saveButton, { color: theme.text }]}>حفظ</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -608,5 +635,35 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
+  modalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.5)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+
+modalContent: {
+  width: '85%',
+  borderRadius: 12,
+  padding: 20,
+},
+
+
+
+modalButtons: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  marginTop: 20,
+},
+
+cancelButton: {
+  fontSize: 16,
+},
+
+saveButton: {
+  fontSize: 16,
+  fontWeight: 'bold',
+},
+
 });
 
