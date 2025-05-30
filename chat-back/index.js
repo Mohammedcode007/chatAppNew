@@ -6,6 +6,7 @@ const { createFriendRequestServer } = require('./websocket/chatServer');
 const authController = require('./controllers/auth');
 const userController = require('./controllers/userController');
 const friendsController = require('./controllers/friendController');
+const uploadRoutes = require('./routes/upload');
 
 
 const { HTTP_PORT, MONGO_URI } = require('./config');
@@ -30,6 +31,9 @@ app.post('/updateUser', authMiddleware, authController.updateUser);
 app.get('/search', userController.searchUsers);
 app.post('/friends/requests',authMiddleware, friendsController.respondToFriendRequest);
 app.get('/friends/requests', authMiddleware, friendsController.getFriendRequests);
+
+
+app.use('/api', uploadRoutes);
 
 // إنشاء WebSocket server
 createFriendRequestServer(server);

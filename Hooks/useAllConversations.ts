@@ -11,6 +11,7 @@ type ConversationSummary = {
   withStatus?: string;  // تأكد أن الحالة هنا اختيارية أو موجودة
   unreadCount: number;
   lastMessage: {
+    messageType: string;
     _id: string;
     sender: string;
     receiver: string;

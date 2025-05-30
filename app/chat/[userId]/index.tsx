@@ -13,8 +13,11 @@ import {
   KeyboardEvent,
   Alert,
   Modal,
+  Image,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from 'expo-image-picker';
+
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useThemeMode } from "@/context/ThemeContext";
 import { useConversation } from "@/Hooks/useConversation";
@@ -23,6 +26,12 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { Audio } from "expo-av";
 import ChatHeader from "@/components/ChatHeader";
 import * as Clipboard from 'expo-clipboard';
+import { pickAndUploadImage } from "@/services/uploadImage";
+import { uploadImage } from "@/services/auth";
+import { API_URL } from "@/config";
+import axios from "axios";
+import AudioMessage from "@/components/AudioMessage";
+import ChatInput from "@/components/ChatInput";
 
 interface Message {
   replyTo?: Message;  // الآن اختيارية
@@ -31,8 +40,13 @@ interface Message {
   sender: string;
   receiver: string;
   timestamp: string;
+  messageType?: "text" | "image" | "sound" | "video" | "gif";
   status: "sent" | "delivered" | "received" | "seen";
 }
+type ImageAsset = {
+  uri: string;
+  // يمكنك إضافة خصائص أخرى حسب الحاجة مثل width, height, type, name...
+};
 
 interface ChatScreenProps {
   chatName: string;
@@ -59,6 +73,7 @@ export default function ChatScreen() {
     openChat,
     closeChat
   } = useConversation(userId);
+  console.log(messages, 'messages');
 
   const [userData, setUserData] = useState<any>(null);
   const flatListRef = useRef<FlatList<Message> | null>(null);
@@ -134,9 +149,22 @@ export default function ChatScreen() {
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
+  // const sendTextMessage = () => {
+  //   if (newMessage.trim().length === 0) return;
+  //   sendMessage({ text: newMessage.trim(), senderId: userData?._id });
+  //   setNewMessage("");
+  //   scrollToEnd();
+  // };
+
   const sendTextMessage = () => {
     if (newMessage.trim().length === 0) return;
-    sendMessage({ text: newMessage.trim(), senderId: userData?._id });
+
+    sendMessage({
+      text: newMessage.trim(),
+      senderId: userData?._id,
+      messageType: "text", // تحديد نوع الرسالة
+    });
+
     setNewMessage("");
     scrollToEnd();
   };
@@ -150,10 +178,98 @@ export default function ChatScreen() {
     const m = minutes < 10 ? "0" + minutes : minutes;
     return `${h}:${m} ${ampm}`;
   };
-
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [durationMillis, setDurationMillis] = useState<number>(0);
+  const [positionMillis, setPositionMillis] = useState<number>(0);
   const renderItem = ({ item }: { item: Message }) => {
     const isMyMessage = item.sender === userData?._id;
 
+    // دالة لتشغيل وإيقاف الصوت
+    const toggleSound = async () => {
+      if (!sound) {
+        const { sound: newSound, status } = await Audio.Sound.createAsync(
+          { uri: item.text },
+          { shouldPlay: true }
+        );
+        setSound(newSound);
+        setIsPlaying(true);
+        if (status.isLoaded) {
+          setDurationMillis(status.durationMillis ?? 0);
+          setPositionMillis(status.positionMillis ?? 0);
+        } else {
+          console.error("Failed to load audio:", status);
+        }
+
+        newSound.setOnPlaybackStatusUpdate((status) => {
+          if ("isPlaying" in status) {
+            setIsPlaying(status.isPlaying);
+            setPositionMillis(status.positionMillis ?? 0);
+            setDurationMillis(status.durationMillis ?? 0);
+            if (!status.isPlaying && status.positionMillis === status.durationMillis) {
+              // نهاية الصوت
+              setIsPlaying(false);
+              setSound(null);
+              setPositionMillis(0);
+            }
+          }
+        });
+      } else {
+        if (isPlaying) {
+          await sound.pauseAsync();
+          setIsPlaying(false);
+        } else {
+          await sound.playAsync();
+          setIsPlaying(true);
+        }
+      }
+    };
+
+    // دالة لتحويل الميلي ثانية إلى صيغة دقيقة:ثانية
+    const formatMillisToTime = (millis: number) => {
+      const totalSeconds = Math.floor(millis / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+    };
+
+    const renderMessageContent = () => {
+      switch (item.messageType) {
+        case 'image':
+          return (
+            <Image
+              source={{ uri: item.text }}
+              style={{ width: 200, height: 200, borderRadius: 12, marginBottom: 4 }}
+              resizeMode="cover"
+            />
+          );
+
+        case 'gif':
+          return (
+            <Image
+              source={{ uri: item.text }}
+              style={{ width: 200, height: 200, borderRadius: 12, marginBottom: 4 }}
+              resizeMode="contain"
+            />
+          );
+
+        case 'sound':
+          return <AudioMessage uri={item.text} />;
+
+
+        default:
+          return (
+            <Text
+              style={{
+                color: isMyMessage ? '#fff' : '#000',
+                fontSize: 16,
+              }}
+            >
+              {item.text}
+            </Text>
+          );
+      }
+    };
     const getStatusIcon = (status: Message["status"]) => {
       switch (status) {
         case "sent":
@@ -171,8 +287,8 @@ export default function ChatScreen() {
 
     return (
       <TouchableOpacity
-      onLongPress={() => setSelectedMessage(item)}
-  activeOpacity={0.7}
+        onLongPress={() => setSelectedMessage(item)}
+        activeOpacity={0.7}
         style={[
           styles.messageContainer,
           { justifyContent: isMyMessage ? "flex-end" : "flex-start" },
@@ -208,14 +324,10 @@ export default function ChatScreen() {
             </View>
           )}
 
-          <Text
-            style={[
-              styles.messageText,
-              { color: isMyMessage ? "#fff" : darkMode ? "#fff" : "#000" },
-            ]}
-          >
-            {item.text}
-          </Text>
+          {renderMessageContent()}
+
+
+
           <View
             style={{
               flexDirection: "row",
@@ -249,184 +361,197 @@ export default function ChatScreen() {
     );
   };
 
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const MAX_KEYBOARD_HEIGHT = 90;
+ const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
-    const showSubscription = Keyboard.addListener("keyboardDidShow", (e: KeyboardEvent) => {
-      setKeyboardHeight(e.endCoordinates.height);
-    });
-    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
-      setKeyboardHeight(0);
-    });
+    const keyboardDidShowListener = Keyboard.addListener("keyboardDidShow", () => setKeyboardVisible(true));
+    const keyboardDidHideListener = Keyboard.addListener("keyboardDidHide", () => setKeyboardVisible(false));
 
     return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
     };
   }, []);
-
-  function onMenuPress(): void {
-    throw new Error("Function not implemented.");
-  }
 
   const onBackPress = () => {
     navigation.goBack();
   };
+  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const pickAndUploadImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 1,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const uri = result.assets[0].uri;
+      setImageUri(uri);
+      await uploadImage(uri);
+    } else {
+      Alert.alert('إلغاء', 'لم يتم اختيار أي صورة');
+    }
+  };
+
+  const uploadImage = async (uri: string) => {
+    setLoading(true);
+
+    const uriParts = uri.split('.');
+    const fileType = uriParts[uriParts.length - 1];
+
+    const formData = new FormData();
+    formData.append('file', {
+      uri: uri,
+      name: `upload.${fileType}`,
+      type: `image/${fileType}`,
+    } as any); // لتفادي مشاكل التوافق في TypeScript
+
+    try {
+      const response = await axios.post(`${API_URL}/api/upload`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      sendMessage({
+        text: response.data.url,
+        senderId: userData?._id,
+        messageType: "image", // تحديد نوع الرسالة
+      });
+
+      setNewMessage("");
+      scrollToEnd();
+    } catch (error) {
+      console.error(error);
+      Alert.alert('خطأ', 'حدث خطأ أثناء رفع الصورة');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+
+
+  const startRecording = async () => {
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert("صلاحية مطلوبة", "يجب منح صلاحية الميكروفون");
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      setRecording(recording);
+      setIsRecording(true);
+    } catch (error) {
+      console.error("فشل في بدء التسجيل:", error);
+      Alert.alert("خطأ", "تعذر بدء التسجيل");
+    }
+  };
+
+  const stopRecording = async () => {
+    try {
+      if (!recording) return;
+
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecording(null);
+      setIsRecording(false);
+
+      if (uri) {
+        await uploadFile(uri, "sound");
+      }
+    } catch (error) {
+      console.error("خطأ في إيقاف التسجيل:", error);
+      Alert.alert("خطأ", "تعذر إيقاف التسجيل");
+    }
+  };
+
+  const uploadFile = async (uri: string, type: "sound") => {
+    setLoading(true);
+
+    const uriParts = uri.split(".");
+    const fileType = uriParts[uriParts.length - 1] || (type === "sound" ? "m4a" : "jpg");
+
+    const formData = new FormData();
+    formData.append("file", {
+      uri,
+      name: `upload.${fileType}`,
+      type: `${type}/${fileType}`,
+    } as any);
+
+    try {
+      const response = await axios.post(`${API_URL}/api/upload`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      console.log(response.data.url, 'response.data.url');
+
+      sendMessage({
+        text: response.data.url,
+        senderId: userData?._id,
+        messageType: 'sound',
+      });
+
+      scrollToEnd();
+    } catch (error) {
+      console.error(`خطأ أثناء رفع ${type}:`, error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: darkMode ? "#000" : "#fff" }}>
+     <SafeAreaView style={{ flex: 1, backgroundColor: darkMode ? "#000" : "#fff" }}>
       <ChatHeader
         chatName={name?.toString() ?? "اسم افتراضي"}
         userStatus={status?.toString() ?? " حاله افتراضيه"}
         onBackPress={onBackPress}
         userId={userId}
       />
+
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
         style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <View style={{ flex: 1, paddingBottom: Math.min(keyboardHeight, MAX_KEYBOARD_HEIGHT) }}>
-            <FlatList<Message>
-              ref={flatListRef}
-              data={messages}
-              extraData={messages}
-              keyExtractor={(item) => item._id}
-              renderItem={renderItem}
-              contentContainerStyle={styles.flatListContent}
-              onContentSizeChange={scrollToEnd}
-              onLayout={scrollToEnd}
-              keyboardShouldPersistTaps="handled"
-            />
+        <FlatList<Message>
+          ref={flatListRef}
+          data={messages}
+          extraData={messages}
+          keyExtractor={(item) => item._id}
+          renderItem={renderItem}
+          contentContainerStyle={styles.flatListContent}
+          onContentSizeChange={scrollToEnd}
+          onLayout={scrollToEnd}
+          keyboardShouldPersistTaps="handled"
+        />
 
-            <View
-              style={[
-                styles.inputContainer,
-                {
-                  backgroundColor: darkMode ? "#121212" : "#f2f2f2",
-                  paddingBottom: insets.bottom || 12, // **هنا تم إضافة مساحة آمنة في الأسفل**
-                },
-              ]}
-            >
-              <TextInput
-                style={[styles.input, { color: darkMode ? "#fff" : "#000" }]}
-                placeholder="اكتب رسالة..."
-                placeholderTextColor={darkMode ? "#888" : "#999"}
-                value={newMessage}
-                onChangeText={setNewMessage}
-                multiline
-              />
-              <TouchableOpacity onPress={sendTextMessage} style={styles.iconButton}>
-                <Ionicons name="send" size={24} color={darkMode ? "#fff" : "#000"} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </TouchableWithoutFeedback>
+        <View style={{ marginBottom: keyboardVisible ? 0 : 8 }}>
+          <ChatInput
+            darkMode={darkMode}
+            newMessage={newMessage}
+            setNewMessage={setNewMessage}
+            pickAndUploadImage={pickAndUploadImage}
+            isRecording={isRecording}
+            startRecording={startRecording}
+            stopRecording={stopRecording}
+            sendTextMessage={sendTextMessage}
+            insetsBottom={0}
+          />
+        </View>
       </KeyboardAvoidingView>
-      {/* قائمة خيارات التفاعل */}
-      <Modal
-        visible={!!selectedMessage}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSelectedMessage(null)}
-      >
-        <TouchableWithoutFeedback onPress={() => setSelectedMessage(null)}>
-          <View style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.4)",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: 20,
-          }}>
-            <View style={{
-              backgroundColor: darkMode ? "#333" : "#fff",
-              borderRadius: 12,
-              padding: 16,
-              width: "100%",
-              maxWidth: 300,
-            }}>
-              <Text style={{
-                fontSize: 16,
-                fontWeight: "bold",
-                marginBottom: 12,
-                color: darkMode ? "#fff" : "#000",
-                textAlign: "center",
-              }}>
-                اختر خياراً
-              </Text>
-
-              {/* زر الرد */}
-              <TouchableOpacity
-                style={{ paddingVertical: 10 }}
-                onPress={() => {
-                  setNewMessage(`@${selectedMessage?.sender}: `);
-                  setSelectedMessage(null);
-                }}
-              >
-                <Text style={{ fontSize: 16, color: "#007aff", textAlign: "center" }}>
-                  رد على الرسالة
-                </Text>
-              </TouchableOpacity>
-
-              {/* قائمة ردود الفعل */}
-              <View style={{ flexDirection: "row", justifyContent: "center", marginVertical: 12 }}>
-                {reactionsList.map((reaction) => (
-                  <TouchableOpacity
-                    key={reaction}
-                    style={{ marginHorizontal: 6 }}
-                    onPress={() => {
-                      if (!selectedMessage) return;
-                      const msgId = selectedMessage._id;
-                      setReactions((prev) => {
-                        const currentReactions = prev[msgId] || [];
-                        return {
-                          ...prev,
-                          [msgId]: currentReactions.includes(reaction)
-                            ? currentReactions.filter(r => r !== reaction)
-                            : [...currentReactions, reaction],
-                        };
-                      });
-                      setSelectedMessage(null);
-                    }}
-                  >
-                    <Text style={{ fontSize: 24 }}>{reaction}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* زر النسخ */}
-              <TouchableOpacity
-                style={{ paddingVertical: 10 }}
-                onPress={async () => {
-                  if (selectedMessage) {
-                    await Clipboard.setStringAsync(selectedMessage.text);
-
-                    Alert.alert("تم النسخ", "تم نسخ نص الرسالة إلى الحافظة");
-                    setSelectedMessage(null);
-                  }
-                }}
-
-              >
-                <Text style={{ fontSize: 16, color: "#007aff", textAlign: "center" }}>
-                  نسخ نص الرسالة
-                </Text>
-              </TouchableOpacity>
-
-              {/* زر إلغاء */}
-              <TouchableOpacity
-                style={{ paddingVertical: 10 }}
-                onPress={() => setSelectedMessage(null)}
-              >
-                <Text style={{ fontSize: 16, color: darkMode ? "#aaa" : "#555", textAlign: "center" }}>
-                  إلغاء
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
     </SafeAreaView>
   );
 }

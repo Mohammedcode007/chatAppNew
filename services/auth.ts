@@ -110,3 +110,38 @@ export const registerUser = async (
     };
   }
 };
+
+
+
+// دالة رفع صورة إلى السيرفر
+export const uploadImage = async (imageUri: string): Promise<{ success: boolean; imageUrl?: string; message?: string }> => {
+  try {
+    // تجهيز بيانات الصورة كـ FormData
+    const formData = new FormData();
+    formData.append('image', {
+      uri: imageUri,
+      type: 'image/jpeg', // أو نوع الصورة المناسب
+      name: 'photo.jpg',  // يمكنك تعديل الاسم حسب الحاجة
+    } as any); // type assertion لتجنب مشاكل TypeScript
+
+    // إرسال الصورة عبر POST إلى endpoint الرفع (تأكد من المسار)
+    const response = await axios.post('/api/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    if (response.status === 201 && response.data.imageUrl) {
+      // رفع ناجح، نعيد رابط الصورة
+      return { success: true, imageUrl: response.data.imageUrl };
+    } else {
+      return { success: false, message: 'Upload failed: Invalid server response.' };
+    }
+  } catch (error: any) {
+    console.error('Upload image error:', error?.response || error?.message || error);
+    return {
+      success: false,
+      message: error?.response?.data?.message || 'Server error during image upload. Please try again later.',
+    };
+  }
+};
