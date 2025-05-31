@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import { useStoreProfile } from "@/Hooks/useStoreProfile";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -26,28 +28,28 @@ const userPremiumFeatures: Feature[] = [
     id: "1",
     name: "✨ Special Welcome Message",
     description: "Unique welcome message with colorful emojis and text.",
-    price: 100,
+    price: 15000,
     icon: "🎉",
   },
   {
     id: "2",
     name: "✔️ Verification Badge",
     description: "Get a verified badge next to your username.",
-    price: 200,
+    price: 8000,
     icon: "👑",
   },
   {
     id: "3",
     name: "🎨 Custom Username Color",
     description: "Choose a special color for your username.",
-    price: 150,
+    price: 5000,
     icon: "🌈",
   },
   {
     id: "4",
     name: "🏅 Custom Badge",
     description: "Select and display a custom badge next to your username.",
-    price: 180,
+    price: 10000,
     icon: "🎖️",
   },
 ];
@@ -124,6 +126,53 @@ const availableBackgrounds = [
 ];
 
 export default function PremiumPurchaseScreen() {
+  const [token, setToken] = useState<string | null>(null);
+  const [userData, setUserData] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const userDataString = await AsyncStorage.getItem('userData');
+        if (userDataString) {
+          const userData = JSON.parse(userDataString);
+          setUserData(userData);
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+  // جلب التوكن من AsyncStorage
+  useEffect(() => {
+    const fetchToken = async () => {
+      try {
+        const storedToken = await AsyncStorage.getItem('authToken');
+        if (storedToken) {
+          setToken(storedToken);
+        }
+      } catch (error) {
+        console.error('فشل في جلب التوكن:', error);
+      }
+    };
+    fetchToken();
+  }, []);
+  const {
+    profile,
+    loading,
+    error,
+    notifications,
+    updateStoreProfile,
+  } = useStoreProfile(userData?._id, token);
+  console.log('profile updated:', profile);
+
+
+  useEffect(() => {
+    console.log('profile updated:', profile);
+  }, [profile]);
+  // مثال على تحديث لون اسم المستخدم في الملف
+
   // حالات المستخدم
   const [selectedUserFeature, setSelectedUserFeature] = useState<Feature | null>(null);
   const [usernameColor, setUsernameColor] = useState("#1E90FF");
@@ -156,10 +205,24 @@ export default function PremiumPurchaseScreen() {
 
     if (feature.id === "4" && !purchasedUserBadges.includes("customBadge")) {
       setPurchasedUserBadges([...purchasedUserBadges, "customBadge"]);
-      setSelectedUserBadge(userCustomBadges[0].id);
+      const badgeId = userCustomBadges[0].id;
+      setSelectedUserBadge(badgeId);
+
+      // تحديث البروفايل
+      updateStoreProfile({ customBadge: badgeId });
     }
-    // تحديث قاعدة البيانات هنا حسب الحاجة
+
+    if (feature.id === "3") {
+      // إذا اشترى المستخدم ميزة لون الاسم
+      updateStoreProfile({ customUsernameColor: usernameColor }, 1000);
+
+      setShowColorPicker(true);
+    }
+
+    // مثال على تحديث ميزة تم شراؤها:
+    // updateStoreProfile({ purchasedUserFeatures: [...(profile?.purchasedUserFeatures || []), feature.id] });
   };
+
 
   // دالة شراء ميزة غرفة
   const handlePurchaseRoomFeature = (feature: Feature) => {
@@ -170,15 +233,31 @@ export default function PremiumPurchaseScreen() {
     );
 
     if (feature.id === "r3" && !purchasedRoomBadges.includes("roomCustomBadge")) {
+      const badgeId = roomCustomBadges[0].id;
       setPurchasedRoomBadges([...purchasedRoomBadges, "roomCustomBadge"]);
-      setSelectedRoomBadge(roomCustomBadges[0].id);
+      setSelectedRoomBadge(badgeId);
+
+      updateStoreProfile({ roomBadge: badgeId });
     }
 
     if (!purchasedRoomFeatures.includes(feature.id)) {
-      setPurchasedRoomFeatures([...purchasedRoomFeatures, feature.id]);
+      const newFeatures = [...purchasedRoomFeatures, feature.id];
+      setPurchasedRoomFeatures(newFeatures);
+
+      updateStoreProfile({ purchasedRoomFeatures: newFeatures });
     }
-    // تحديث قاعدة البيانات هنا حسب الحاجة
   };
+
+  const handleSelectAvatar = (avatarId: string) => {
+    setSelectedAvatar(avatarId);
+    updateStoreProfile({ selectedAvatar: avatarId });
+  };
+
+  const handleSelectBackground = (bgId: string) => {
+    setSelectedBackground(bgId);
+    updateStoreProfile({ selectedBackground: bgId });
+  };
+
 
   const renderFeatureItem = (
     item: Feature,
@@ -230,7 +309,7 @@ export default function PremiumPurchaseScreen() {
         styles.avatarItem,
         selectedAvatar === avatar.id && styles.avatarSelected,
       ]}
-      onPress={() => setSelectedAvatar(avatar.id)}
+      onPress={() => handleSelectAvatar(avatar.id)}
     >
       <Image source={{ uri: avatar.uri }} style={styles.avatarImage} />
     </TouchableOpacity>
@@ -273,7 +352,7 @@ export default function PremiumPurchaseScreen() {
         styles.backgroundItem,
         selectedBackground === bg.id && styles.backgroundSelected,
       ]}
-      onPress={() => setSelectedBackground(bg.id)}
+      onPress={() => handleSelectBackground(bg.id)}
     >
       <Image source={{ uri: bg.uri }} style={styles.backgroundImage} />
     </TouchableOpacity>
@@ -281,6 +360,10 @@ export default function PremiumPurchaseScreen() {
 
   return (
     <ScrollView style={styles.container}>
+      {error ? (
+        <Text style={styles.errorText}>{error}</Text>
+      ) : null}
+
       {/* اختيار القسم: مستخدم أو غرفة */}
       <View style={styles.toggleSection}>
         <Button
@@ -313,7 +396,9 @@ export default function PremiumPurchaseScreen() {
               {showColorPicker && (
                 <ColorPicker
                   color={usernameColor}
-                  onColorChangeComplete={(color) => setUsernameColor(color)}
+                  onColorChangeComplete={(color) => {
+                    setUsernameColor(color);
+                  }}
                   thumbSize={30}
                   sliderSize={30}
                   noSnap={true}
@@ -393,9 +478,9 @@ export default function PremiumPurchaseScreen() {
                     styles.avatarPreview,
                     selectedFrame
                       ? {
-                          borderColor: availableFrames.find(f => f.id === selectedFrame)?.color,
-                          borderWidth: 4,
-                        }
+                        borderColor: availableFrames.find(f => f.id === selectedFrame)?.color,
+                        borderWidth: 4,
+                      }
                       : {},
                     selectedEffect === "effect1" && { shadowColor: "yellow", shadowRadius: 10, shadowOpacity: 0.8, shadowOffset: { width: 0, height: 0 } },
                     selectedEffect === "effect2" && { shadowColor: "black", shadowRadius: 5, shadowOpacity: 0.7, shadowOffset: { width: 2, height: 2 } },
@@ -571,6 +656,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     marginVertical: 10,
   },
+  errorText: {
+    color: 'red',
+    fontWeight: 'bold',
+    marginBottom: 10,
+    fontSize: 16,
+    textAlign: 'center',
+  },
   backgroundItem: {
     margin: 5,
     borderRadius: 10,
@@ -617,5 +709,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 6,
     paddingVertical: 2,
+  },
+  profileContainer: {
+    marginBottom: 20,
+  },
+  notificationsContainer: {
+    marginBottom: 20,
+  },
+  notificationText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  title: {
+    fontWeight: 'bold',
+    fontSize: 18,
+    marginBottom: 5,
   },
 });

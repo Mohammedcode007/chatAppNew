@@ -310,125 +310,165 @@ async function handleMessage(message, ws, userSockets) {
 
 
 
+    case 'update_or_get_coins': {
+      const { userId, newCoins } = msg;
+
+      // السماح فقط للمستخدم بتعديل أو جلب بياناته هو
+      if (userId !== ws.userId) {
+        sendToUser(userSockets, ws.userId, {
+          type: 'update_coins_failed',
+          message: 'لا يمكنك تعديل أو جلب عملات مستخدم آخر',
+        });
+        return;
+      }
+
+      try {
+        const user = await User.findById(userId);
+
+        if (!user) {
+          sendToUser(userSockets, ws.userId, {
+            type: 'update_coins_failed',
+            message: 'المستخدم غير موجود',
+          });
+          return;
+        }
+
+        // إذا تم إرسال قيمة جديدة لإضافتها
+        if (typeof newCoins !== 'undefined') {
+          if (typeof newCoins !== 'number' || isNaN(newCoins)) {
+            sendToUser(userSockets, ws.userId, {
+              type: 'update_coins_failed',
+              message: 'عدد العملات غير صالح',
+            });
+            return;
+          }
+
+          // جمع العملات الجديدة على الرصيد الحالي
+          user.coins += newCoins;
+          await user.save();
+        }
+
+        // إرسال البيانات النهائية بعد التعديل أو فقط للجلب
+        sendToUser(userSockets, userId, {
+          type: 'coins_info',
+          coins: user.coins,
+        });
+
+      } catch (error) {
+        console.error('خطأ في جلب/تحديث العملات:', error.message);
+        sendToUser(userSockets, ws.userId, {
+          type: 'update_coins_failed',
+          message: 'حدث خطأ أثناء جلب أو تحديث العملات',
+        });
+      }
+
+      break;
+    }
+
+
+ case 'update_store_profile': {
+  const {
+    userId,
+    inventory,
+    purchaseHistory,
+    selectedAvatar,
+    selectedFrame,
+    selectedEffect,
+    selectedBackground,
+    customUsernameColor,
+    badges,
+    activeCustomBadge,
+    subscription,
+    specialWelcomeMessage,
+    cost, // سعر التحديث (عدد العملات)
+  } = msg;
+
+  // البحث عن المستخدم حسب المعرف
+  const user = await User.findById(userId)
+    .populate('selectedAvatar selectedFrame selectedEffect selectedBackground')
+    .exec();
+
+  if (!user) return;
+
+  // التحقق من وجود رصيد كافٍ
+  if (cost !== undefined) {
+    if ((user.coins ?? 0) < cost) {
+      // إرسال رسالة خطأ لعدم كفاية الرصيد
+      sendToUser(userSockets, userId, {
+        type: 'update_store_profile_failed',
+        message: 'رصيد العملات غير كافٍ لإجراء هذا التحديث.',
+      });
+      break;
+    } else {
+      // خصم العملات
+      user.coins = (user.coins ?? 0) - cost;
+    }
+  }
+
+  // تحديث الحقول إذا تم إرسالها في الرسالة
+  if (inventory !== undefined) {
+    user.inventory = inventory;
+  }
+
+  if (purchaseHistory !== undefined) {
+    user.purchaseHistory = purchaseHistory;
+  }
+
+  if (selectedAvatar !== undefined) {
+    user.selectedAvatar = selectedAvatar;
+  }
+
+  if (selectedFrame !== undefined) {
+    user.selectedFrame = selectedFrame;
+  }
+
+  if (selectedEffect !== undefined) {
+    user.selectedEffect = selectedEffect;
+  }
+
+  if (selectedBackground !== undefined) {
+    user.selectedBackground = selectedBackground;
+  }
+
+  if (customUsernameColor !== undefined) {
+    user.customUsernameColor = customUsernameColor;
+  }
+
+  if (badges !== undefined) {
+    user.badges = badges;
+  }
+
+  if (activeCustomBadge !== undefined) {
+    user.activeCustomBadge = activeCustomBadge;
+  }
+
+  if (subscription !== undefined) {
+    user.subscription = subscription;
+  }
+
+  if (specialWelcomeMessage !== undefined) {
+    user.specialWelcomeMessage = specialWelcomeMessage;
+  }
+
+  await user.save();
+
+  // إرسال تأكيد التحديث مع إرسال بيانات البروفايل المحدثة كاملة
+  sendToUser(userSockets, userId, {
+    type: 'update_store_profile_success',
+    message: 'تم تحديث بيانات المتجر بنجاح',
+    profile: user,
+  });
+
+  break;
+}
 
 
 
 
-    // case 'private_message': {
-    //   const { toUserId, text, tempId } = msg;
-
-    //   // التحقق من وجود المرسل والمستلم
-    //   const sender = await User.findById(ws.userId);
-    //   const receiver = await User.findById(toUserId);
-
-    //   if (!sender || !receiver) {
-    //     sendToUser(userSockets, ws.userId, {
-    //       type: 'message_failed',
-    //       tempId,
-    //       reason: 'المستخدم غير موجود',
-    //     });
-    //     return;
-    //   }
-
-    //   // التحقق من الحظر
-    //   const senderBlockedReceiver = sender.blockedUsers.includes(toUserId);
-    //   const receiverBlockedSender = receiver.blockedUsers.includes(ws.userId);
-
-    //   if (senderBlockedReceiver || receiverBlockedSender) {
-    //     sendToUser(userSockets, ws.userId, {
-    //       type: 'message_blocked',
-    //       tempId,
-    //       reason: senderBlockedReceiver
-    //         ? 'لقد قمت بحظر هذا المستخدم'
-    //         : 'هذا المستخدم قام بحظرك، لا يمكنك إرسال رسائل إليه',
-    //     });
-    //     return;
-    //   }
-
-    //   // إنشاء الرسالة الجديدة
-    //   const newMessage = new Message({
-    //     sender: ws.userId,
-    //     receiver: toUserId,
-    //     text,
-    //     timestamp: new Date(),
-    //     status: 'sent',
-    //   });
-
-    //   await newMessage.save();
-
-    //   // تأكيد للمرسل
-    //   sendToUser(userSockets, ws.userId, {
-    //     type: 'message_sent_confirmation',
-    //     messageId: newMessage._id.toString(),
-    //     tempId,
-    //     status: 'sent',
-    //   });
-
-    //   // إرسال الرسالة للمستلم
-    //   sendToUser(userSockets, toUserId, {
-    //     type: 'new_private_message',
-    //     message: {
-    //       _id: newMessage._id.toString(),
-    //       sender: ws.userId,
-    //       receiver: toUserId,
-    //       text,
-    //       timestamp: newMessage.timestamp.toISOString(),
-    //       status: 'sent',
-    //     },
-    //   });
-
-    //   // تحديث حالة الرسالة حسب حالة المستلم
-    //   if (receiver.status === 'online') {
-    //     const isChatOpen = activeChats[toUserId] === ws.userId;
-
-    //     newMessage.status = isChatOpen ? 'seen' : 'delivered';
-    //     await newMessage.save();
-
-    //     // إشعار المرسل بتحديث الحالة
-    //     sendToUser(userSockets, ws.userId, {
-    //       type: 'message_status_updated',
-    //       messageId: newMessage._id.toString(),
-    //       status: newMessage.status,
-    //       receiverId: toUserId,
-    //     });
-
-    //     // إرسال إشعار للمستلم إذا لم يكن يفتح المحادثة
-    //     if (!isChatOpen) {
-    //       const unreadCount = await Message.countDocuments({
-    //         sender: ws.userId,
-    //         receiver: toUserId,
-    //         status: { $ne: 'seen' },
-    //       });
-
-    //       const senderUser = await User.findById(ws.userId, 'username avatarUrl').lean();
-
-    //       sendToUser(userSockets, toUserId, {
-    //         type: 'conversation_updated',
-    //         conversation: {
-    //           withUserId: ws.userId,
-    //           withUsername: senderUser?.username || 'Unknown',
-    //           withAvatarUrl: senderUser?.avatarUrl || null,
-    //           unreadCount,
-    //           lastMessage: {
-    //             _id: newMessage._id.toString(),
-    //             sender: ws.userId,
-    //             receiver: toUserId,
-    //             text,
-    //             timestamp: newMessage.timestamp,
-    //             status: newMessage.status,
-    //           },
-    //         },
-    //       });
-    //     }
-    //   }
-
-    //   break;
-    // }
 
 
     case 'private_message': {
       const { toUserId, text, tempId, messageType = 'text' } = msg; // استخراج نوع الرسالة مع قيمة افتراضية
-      console.log(messageType);
 
       // التحقق من وجود المرسل والمستلم
       const sender = await User.findById(ws.userId);
@@ -714,84 +754,7 @@ async function handleMessage(message, ws, userSockets) {
       console.log(`${ws.userId} has closed the chat`);
       break;
     }
-    // case 'get_all_conversations': {
-    //   const allMessages = await Message.find({
-    //     $or: [
-    //       { sender: ws.userId },
-    //       { receiver: ws.userId }
-    //     ]
-    //   }).sort({ timestamp: 1 });
 
-    //   const conversationsMap = {};
-
-    //   allMessages.forEach(message => {
-    //     const otherUserId = message.sender.toString() === ws.userId ? message.receiver.toString() : message.sender.toString();
-
-    //     if (!conversationsMap[otherUserId]) {
-    //       conversationsMap[otherUserId] = {
-    //         messages: [],
-    //         unreadCount: 0,
-    //         lastMessage: null,
-    //       };
-    //     }
-
-    //     conversationsMap[otherUserId].messages.push(message);
-    //     conversationsMap[otherUserId].lastMessage = message;
-
-    //     if (
-    //       message.receiver.toString() === ws.userId &&
-    //       message.status !== 'seen'
-    //     ) {
-    //       conversationsMap[otherUserId].unreadCount++;
-    //     }
-    //   });
-
-    //   // جلب بيانات المستخدمين مقابل كل محادثة دفعة واحدة لتحسين الأداء
-    //   const otherUserIds = Object.keys(conversationsMap);
-
-    //   const usersData = await User.find({ _id: { $in: otherUserIds } }, 'username avatarUrl').lean();
-
-    //   // تحويل بيانات المستخدمين إلى كائن مفتاحه هو _id لتسهيل الوصول
-    //   const usersMap = {};
-    //   usersData.forEach(user => {
-    //     usersMap[user._id.toString()] = user;
-    //   });
-
-    //   const conversations = otherUserIds.map(userId => {
-    //     const convo = conversationsMap[userId];
-    //     const user = usersMap[userId] || { username: 'Unknown', avatarUrl: null };
-
-    //     return {
-    //       withUserId: userId,
-    //       withUsername: user.username,
-    //       withAvatarUrl: user.avatarUrl,
-    //       unreadCount: convo.unreadCount,
-    //       lastMessage: {
-    //         _id: convo.lastMessage._id.toString(),
-    //         sender: convo.lastMessage.sender.toString(),
-    //         receiver: convo.lastMessage.receiver.toString(),
-    //         text: convo.lastMessage.text,
-    //         timestamp: convo.lastMessage.timestamp,
-    //         status: convo.lastMessage.status,
-    //       },
-    //       messages: convo.messages.map(msg => ({
-    //         _id: msg._id.toString(),
-    //         sender: msg.sender.toString(),
-    //         receiver: msg.receiver.toString(),
-    //         text: msg.text,
-    //         timestamp: msg.timestamp,
-    //         status: msg.status,
-    //       })),
-    //     };
-    //   });
-
-    //   sendToUser(userSockets, ws.userId, {
-    //     type: 'all_conversations',
-    //     conversations,
-    //   });
-
-    //   break;
-    // }
     case 'get_all_conversations': {
       const allMessages = await Message.find({
         $or: [

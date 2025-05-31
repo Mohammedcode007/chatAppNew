@@ -1,7 +1,9 @@
+import { useCoins } from "@/Hooks/useCoins";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useEffect, useRef, useState } from "react";
-import { 
-  View, Text, StyleSheet, FlatList, TouchableOpacity, Image, 
-  ListRenderItemInfo, Animated, Easing, Modal, Button, Alert, 
+import {
+  View, Text, StyleSheet, FlatList, TouchableOpacity, Image,
+  ListRenderItemInfo, Animated, Easing, Modal, Button, Alert,
   TextInput,
   ScrollView
 } from "react-native";
@@ -43,6 +45,53 @@ const CoinStoreScreen: React.FC = () => {
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
+  const [token, setToken] = useState<string | null>(null);
+  const [userData, setUserData] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const userDataString = await AsyncStorage.getItem('userData');
+        if (userDataString) {
+          const userData = JSON.parse(userDataString);
+          setUserData(userData);
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+  // جلب التوكن من AsyncStorage
+  useEffect(() => {
+    const fetchToken = async () => {
+      try {
+        const storedToken = await AsyncStorage.getItem('authToken');
+        if (storedToken) {
+          setToken(storedToken);
+        }
+      } catch (error) {
+        console.error('فشل في جلب التوكن:', error);
+      }
+    };
+    fetchToken();
+  }, []);
+
+  // استدعاء useCoins فقط إذا كان token موجود
+  const coinsData = useCoins(userData?._id, token); // استدعاء ثابت بدون شرط
+
+  const { coins, loading, error, notifications, updateCoins } = coinsData;
+
+  // الحالة المحلية وقاعدة الإضافة كما هي
+  const [addAmount, setAddAmount] = useState<number>(0);
+
+  const handleAddCoins = () => {
+    if (addAmount > 0) {
+      updateCoins(addAmount);
+      setAddAmount(0);
+    }
+  };
 
   useEffect(() => {
     Animated.parallel([
@@ -68,13 +117,14 @@ const CoinStoreScreen: React.FC = () => {
   };
 
   // عند تأكيد الشراء - نزيد الرصيد ونغلق النافذة
-  const confirmPurchase = () => {
-    if (selectedPackage) {
-      setBalance(prev => prev + selectedPackage.coins);
-      setModalVisible(false);
-      Alert.alert("تم الشراء", `تم إضافة ${selectedPackage.coins.toLocaleString()} عملة إلى رصيدك.`);
-    }
-  };
+const confirmPurchase = () => {
+  if (selectedPackage) {
+    updateCoins(selectedPackage.coins); // تحديث الرصيد عبر useCoins
+    setModalVisible(false);
+    Alert.alert("تم الشراء", `تم إضافة ${selectedPackage.coins.toLocaleString()} عملة إلى رصيدك.`);
+  }
+};
+
 
   // عند إلغاء الشراء
   const cancelPurchase = () => {
@@ -101,7 +151,7 @@ const CoinStoreScreen: React.FC = () => {
       <Text style={styles.topUserAmount}>{item.rechargeAmount.toLocaleString()} CPX</Text>
     </View>
   );
-    const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
 
   // طريقة الدفع المختارة
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(paymentMethods[0]);
@@ -114,7 +164,7 @@ const CoinStoreScreen: React.FC = () => {
   const calculateCoins = (amountStr: string) => {
     const amount = parseFloat(amountStr);
     if (isNaN(amount) || amount <= 0) return 0;
-    return Math.floor(amount * 100); 
+    return Math.floor(amount * 100);
   };
 
   // فتح مودال الدفع عند الضغط على زر الدفع
@@ -125,17 +175,16 @@ const CoinStoreScreen: React.FC = () => {
   };
 
   // تأكيد الدفع
-  const confirmPayment = () => {
-    const coinsToAdd = calculateCoins(paymentAmount);
-    if (coinsToAdd <= 0) {
-      Alert.alert("خطأ", "يرجى إدخال مبلغ صحيح أكبر من صفر.");
-      return;
-    }
-    // في الواقع هنا يتم استدعاء API للدفع... الآن نضيف الكوينز مباشرةً
-    setBalance(prev => prev + coinsToAdd);
-    setPaymentModalVisible(false);
-    Alert.alert("تم الدفع", `تم إضافة ${coinsToAdd.toLocaleString()} عملة إلى رصيدك.`);
-  };
+const confirmPayment = () => {
+  const coinsToAdd = calculateCoins(paymentAmount);
+  if (coinsToAdd <= 0) {
+    Alert.alert("خطأ", "يرجى إدخال مبلغ صحيح أكبر من صفر.");
+    return;
+  }
+  updateCoins(coinsToAdd);  // تحديث الرصيد عبر useCoins
+  setPaymentModalVisible(false);
+  Alert.alert("تم الدفع", `تم إضافة ${coinsToAdd.toLocaleString()} عملة إلى رصيدك.`);
+};
 
   return (
     <View style={styles.container}>
@@ -146,7 +195,7 @@ const CoinStoreScreen: React.FC = () => {
           source={require("../../assets/images/coin.jpg")}
           style={styles.balanceIcon}
         />
-        <Text style={styles.balanceText}>{balance.toLocaleString()} CPX</Text>
+        <Text style={styles.balanceText}>{(coins ?? 0).toLocaleString()} Coins</Text>
       </View>
 
       <Animated.View
@@ -196,10 +245,10 @@ const CoinStoreScreen: React.FC = () => {
         </View>
       </Modal>
 
-  <TouchableOpacity style={styles.payButton} onPress={onPayPress}>
+      <TouchableOpacity style={styles.payButton} onPress={onPayPress}>
         <Text style={styles.payButtonText}>Payment</Text>
       </TouchableOpacity>
-       {/* مودال الدفع */}
+      {/* مودال الدفع */}
       <Modal
         visible={paymentModalVisible}
         transparent={true}
@@ -401,7 +450,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
   },
-    paymentModalContent: {
+  paymentModalContent: {
     backgroundColor: "#fff",
     borderRadius: 12,
     padding: 20,

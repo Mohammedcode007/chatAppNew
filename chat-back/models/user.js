@@ -85,21 +85,31 @@ const Item = require('../models/item');
 
 const inventoryItemSchema = new mongoose.Schema({
   itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true },
-  quantity: { type: Number, default: 1 },  // كمية العنصر في المخزون
+  quantity: { type: Number, default: 1 },
   acquiredAt: { type: Date, default: Date.now },
-  expiresAt: { type: Date }, // صلاحية العنصر (اختياري)
-  active: { type: Boolean, default: false }, // هل العنصر مستخدم/مفعل حالياً
+  expiresAt: { type: Date },
+  active: { type: Boolean, default: false },
 });
 
 const purchaseRecordSchema = new mongoose.Schema({
   itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true },
-  price: { type: Number, required: true },  // السعر وقت الشراء
+  price: { type: Number, required: true },
   purchasedAt: { type: Date, default: Date.now },
-  paymentMethod: { type: String, default: 'coins' }, // طريقة الدفع (عملات، بطاقة، ...الخ)
+  paymentMethod: { type: String, default: 'coins' },
+});
+
+const badgeSchema = new mongoose.Schema({
+  badgeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },
+  acquiredAt: { type: Date, default: Date.now },
+  active: { type: Boolean, default: false },
+});
+
+const activeCustomBadgeSchema = new mongoose.Schema({
+  badgeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', default: null },
+  activatedAt: { type: Date, default: null },
 });
 
 const userSchema = new mongoose.Schema({
-  // معلومات المستخدم الأساسية
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true, select: false },
   email: { type: String, unique: true, sparse: true, default: '' },
@@ -107,72 +117,44 @@ const userSchema = new mongoose.Schema({
   gender: { type: String, enum: ['male', 'female', 'other'], default: 'male' },
   age: { type: Number, default: 18 },
   birthday: { type: Date, default: () => new Date('2000-01-01') },
-  verified: { type: Boolean, default: true },
+  verified: { type: Boolean, default: true },  // حالة التحقق
+
   country: { type: String, default: 'Unknown' },
   views: { type: Number, default: 0 },
   messages: { type: Number, default: 0 },
+  status: { type: String, enum: ['offline', 'online', 'busy'], default: 'offline' },
 
-  status: {
-    type: String,
-    enum: ['offline', 'online', 'busy'],
-    default: 'offline',
-  },
-
-  friends: {
-    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    default: [],
-  },
+  friends: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], default: [] },
   blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-
-  sentFriendRequests: {
-    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    default: [],
-  },
-  receivedFriendRequests: {
-    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    default: [],
-  },
+  sentFriendRequests: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], default: [] },
+  receivedFriendRequests: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], default: [] },
 
   coins: { type: Number, default: 1500 },
-
   posts: { type: Number, default: 0 },
   followers: { type: Number, default: 0 },
   following: { type: Number, default: 0 },
 
-  inventory: {
-    type: [inventoryItemSchema],
-    default: [],
-  },
+  inventory: { type: [inventoryItemSchema], default: [] },
+  purchaseHistory: { type: [purchaseRecordSchema], default: [] },
 
-  purchaseHistory: {
-    type: [purchaseRecordSchema],
-    default: [],
-  },
-
-  // التخصيصات التجميلية المستخدمة
+  // التخصيصات التجميلية
   selectedAvatar: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', default: null },
   selectedFrame: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', default: null },
   selectedEffect: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', default: null },
   selectedBackground: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', default: null },
 
-  // تخصيص ألوان اسم المستخدم (مثلاً للشراء)
-  customUsernameColor: { type: String, default: null }, // كود اللون (hex أو rgba)
+  customUsernameColor: { type: String, default: 'black' },  // لون اسم المستخدم
 
-  // الشارات (Badges) المشتراة
-  badges: [{
-    badgeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' }, // نوع الشارة
-    acquiredAt: { type: Date, default: Date.now },
-    active: { type: Boolean, default: false }, // هل الشارة مفعلة حالياً
-  }],
+  badges: { type: [badgeSchema], default: [] },
+
+  activeCustomBadge: { type: activeCustomBadgeSchema, default: {} }, // الشارة المفعلة المخصصة
 
   subscription: {
-    plan: {
-      type: String,
-      enum: ['free', 'silver', 'gold', 'vip'],
-      default: 'free',
-    },
+    plan: { type: String, enum: ['free', 'silver', 'gold', 'vip'], default: 'free' },
     expiresAt: { type: Date, default: null },
   },
+
+  specialWelcomeMessage: { type: String, default: "مرحبا بك في التطبيق!" },  // رسالة ترحيب خاصة
 
   createdAt: { type: Date, default: Date.now },
 });
