@@ -513,46 +513,44 @@ export default function ChatScreen() {
   };
 
   return (
-     <SafeAreaView style={{ flex: 1, backgroundColor: darkMode ? "#000" : "#fff" }}>
-      <ChatHeader
-        chatName={name?.toString() ?? "اسم افتراضي"}
-        userStatus={status?.toString() ?? " حاله افتراضيه"}
-        onBackPress={onBackPress}
-        userId={userId}
-      />
+   <KeyboardAvoidingView
+  style={{ flex: 1 }}
+  behavior={Platform.OS === "ios" ? "padding" : "height"}
+  keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0} // يمكن تعديل الرقم حسب الـ header
+>
+  <SafeAreaView style={{ flex: 1, backgroundColor: darkMode ? "#000" : "#fff" }}>
+    <ChatHeader
+      chatName={name?.toString() ?? "اسم افتراضي"}
+      userStatus={status?.toString() ?? " حاله افتراضيه"}
+      onBackPress={onBackPress}
+      userId={userId}
+    />
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
-      >
-        <FlatList<Message>
-          ref={flatListRef}
-          data={messages}
-          extraData={messages}
-          keyExtractor={(item) => item._id}
-          renderItem={renderItem}
-          contentContainerStyle={styles.flatListContent}
-          onContentSizeChange={scrollToEnd}
-          onLayout={scrollToEnd}
-          keyboardShouldPersistTaps="handled"
-        />
+    <FlatList
+      ref={flatListRef}
+      data={messages}
+      extraData={messages}
+      keyExtractor={(item) => item._id}
+      renderItem={renderItem}
+      contentContainerStyle={styles.flatListContent}
+      onContentSizeChange={scrollToEnd}
+      onLayout={scrollToEnd}
+      keyboardShouldPersistTaps="handled"
+    />
 
-        <View style={{ marginBottom: keyboardVisible ? 0 : 8 }}>
-          <ChatInput
-            darkMode={darkMode}
-            newMessage={newMessage}
-            setNewMessage={setNewMessage}
-            pickAndUploadImage={pickAndUploadImage}
-            isRecording={isRecording}
-            startRecording={startRecording}
-            stopRecording={stopRecording}
-            sendTextMessage={sendTextMessage}
-            insetsBottom={0}
-          />
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    <ChatInput
+      darkMode={darkMode}
+      newMessage={newMessage}
+      setNewMessage={setNewMessage}
+      pickAndUploadImage={pickAndUploadImage}
+      isRecording={isRecording}
+      startRecording={startRecording}
+      stopRecording={stopRecording}
+      sendTextMessage={sendTextMessage}
+      insetsBottom={0}
+    />
+  </SafeAreaView>
+</KeyboardAvoidingView>
   );
 }
 

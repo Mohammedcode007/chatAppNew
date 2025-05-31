@@ -150,6 +150,22 @@ export default function MoreScreen() {
                 />
                 <MoreItem
                     textColor={darkMode ? Colors.dark.text : Colors.light.text}
+                    icon="storefront-outline"
+                    title={t('Store')}
+                    direction={isRTL ? 'left' : 'right'}
+                    onPress={() => router.push('/StoreScreens/StoreScreens')}
+
+                />
+                    <MoreItem
+                    textColor={darkMode ? Colors.dark.text : Colors.light.text}
+                    icon="storefront-outline"
+                    title={t('Premium')}
+                    direction={isRTL ? 'left' : 'right'}
+                    onPress={() => router.push('/StoreScreens/PremiumPurchasePage')}
+
+                />
+                <MoreItem
+                    textColor={darkMode ? Colors.dark.text : Colors.light.text}
                     icon="document-text-outline"
                     title={t('Terms of App')}
                     direction={isRTL ? 'left' : 'right'}
