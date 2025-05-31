@@ -366,101 +366,103 @@ async function handleMessage(message, ws, userSockets) {
     }
 
 
- case 'update_store_profile': {
-  const {
-    userId,
-    inventory,
-    purchaseHistory,
-    selectedAvatar,
-    selectedFrame,
-    selectedEffect,
-    selectedBackground,
-    customUsernameColor,
-    badges,
-    activeCustomBadge,
-    subscription,
-    specialWelcomeMessage,
-    cost, // سعر التحديث (عدد العملات)
-  } = msg;
+    case 'update_store_profile': {
+      const {
+        userId,
+        inventory,
+        purchaseHistory,
+        selectedAvatar,
+        selectedFrame,
+        selectedEffect,
+        selectedBackground,
+        customUsernameColor,
+        badge,
+        subscription,
+        specialWelcomeMessage,
+        verified, // ✅ الحالة الجديدة: التحقق من الحساب
 
-  // البحث عن المستخدم حسب المعرف
-  const user = await User.findById(userId)
-    .populate('selectedAvatar selectedFrame selectedEffect selectedBackground')
-    .exec();
+        cost, // سعر التحديث (عدد العملات)
+      } = msg;
 
-  if (!user) return;
+      // البحث عن المستخدم حسب المعرف
+      const user = await User.findById(userId)
+        .populate('selectedAvatar selectedFrame selectedEffect selectedBackground')
+        .exec();
 
-  // التحقق من وجود رصيد كافٍ
-  if (cost !== undefined) {
-    if ((user.coins ?? 0) < cost) {
-      // إرسال رسالة خطأ لعدم كفاية الرصيد
+      if (!user) return;
+
+      // التحقق من وجود رصيد كافٍ
+      if (cost !== undefined) {
+        if ((user.coins ?? 0) < cost) {
+          // إرسال رسالة خطأ لعدم كفاية الرصيد
+          sendToUser(userSockets, userId, {
+            type: 'update_store_profile_failed',
+            message: 'رصيد العملات غير كافٍ لإجراء هذا التحديث.',
+          });
+          break;
+        } else {
+          // خصم العملات
+          user.coins = (user.coins ?? 0) - cost;
+        }
+      }
+
+      // تحديث الحقول إذا تم إرسالها في الرسالة
+      if (inventory !== undefined) {
+        user.inventory = inventory;
+      }
+
+      if (purchaseHistory !== undefined) {
+        user.purchaseHistory = purchaseHistory;
+      }
+
+      if (selectedAvatar !== undefined) {
+        user.selectedAvatar = selectedAvatar;
+      }
+
+      if (selectedFrame !== undefined) {
+        user.selectedFrame = selectedFrame;
+      }
+
+      if (selectedEffect !== undefined) {
+        user.selectedEffect = selectedEffect;
+      }
+
+      if (selectedBackground !== undefined) {
+        user.selectedBackground = selectedBackground;
+      }
+
+      if (customUsernameColor !== undefined) {
+        user.customUsernameColor = customUsernameColor;
+      }
+
+      if (badge !== undefined) {
+        user.badge = msg.badge;
+      }
+
+
+      if (subscription !== undefined) {
+        user.subscription = subscription;
+      }
+
+      if (specialWelcomeMessage !== undefined) {
+        user.specialWelcomeMessage = specialWelcomeMessage;
+      }
+      // ✅ تحديث حالة التحقق إذا تم إرسالها
+      if (verified !== undefined) {
+        user.verified = verified;
+      }
+
+      await user.save();
+
+      // إرسال تأكيد التحديث مع إرسال بيانات البروفايل المحدثة كاملة
       sendToUser(userSockets, userId, {
-        type: 'update_store_profile_failed',
-        message: 'رصيد العملات غير كافٍ لإجراء هذا التحديث.',
+        type: 'update_store_profile_success',
+        message: 'تم تحديث بيانات المتجر بنجاح',
+        profile: user,
       });
+
       break;
-    } else {
-      // خصم العملات
-      user.coins = (user.coins ?? 0) - cost;
     }
-  }
-
-  // تحديث الحقول إذا تم إرسالها في الرسالة
-  if (inventory !== undefined) {
-    user.inventory = inventory;
-  }
-
-  if (purchaseHistory !== undefined) {
-    user.purchaseHistory = purchaseHistory;
-  }
-
-  if (selectedAvatar !== undefined) {
-    user.selectedAvatar = selectedAvatar;
-  }
-
-  if (selectedFrame !== undefined) {
-    user.selectedFrame = selectedFrame;
-  }
-
-  if (selectedEffect !== undefined) {
-    user.selectedEffect = selectedEffect;
-  }
-
-  if (selectedBackground !== undefined) {
-    user.selectedBackground = selectedBackground;
-  }
-
-  if (customUsernameColor !== undefined) {
-    user.customUsernameColor = customUsernameColor;
-  }
-
-  if (badges !== undefined) {
-    user.badges = badges;
-  }
-
-  if (activeCustomBadge !== undefined) {
-    user.activeCustomBadge = activeCustomBadge;
-  }
-
-  if (subscription !== undefined) {
-    user.subscription = subscription;
-  }
-
-  if (specialWelcomeMessage !== undefined) {
-    user.specialWelcomeMessage = specialWelcomeMessage;
-  }
-
-  await user.save();
-
-  // إرسال تأكيد التحديث مع إرسال بيانات البروفايل المحدثة كاملة
-  sendToUser(userSockets, userId, {
-    type: 'update_store_profile_success',
-    message: 'تم تحديث بيانات المتجر بنجاح',
-    profile: user,
-  });
-
-  break;
-}
 
 
 
@@ -946,6 +948,346 @@ async function handleMessage(message, ws, userSockets) {
         })),
       });
 
+      break;
+    }
+    case 'create_group': {
+      const { groupName, userId } = msg;
+
+      if (!groupName || !userId) {
+        sendToUser(userSockets, userId || ws.userId, {
+          type: 'create_group_failed',
+          message: 'يجب تقديم اسم المجموعة ومعرف المستخدم',
+        });
+        break;
+      }
+
+      try {
+        const Group = require('../../models/group');
+        const User = require('../../models/user'); // تأكد من استدعاء نموذج المستخدم
+
+        // التحقق من عدم وجود مجموعة بنفس الاسم مسبقًا
+        const existingGroup = await Group.findOne({ name: groupName });
+        if (existingGroup) {
+          sendToUser(userSockets, userId, {
+            type: 'create_group_failed',
+            message: 'اسم المجموعة مستخدم بالفعل، يرجى اختيار اسم آخر.',
+          });
+          break;
+        }
+
+        // إنشاء المجموعة
+        const newGroup = await Group.create({
+          name: groupName,
+          creator: userId,
+          members: [userId],
+          owners: [userId],
+          admins: [],
+          blocked: [],
+          description: '',
+          avatar: '',
+          isPublic: true,
+          password: '',
+          tag: '',
+          messages: [],
+          lastMessage: null,
+          logs: [`تم إنشاء المجموعة بواسطة المستخدم ${userId}`],
+          inviteLink: '',
+          pinMessage: null,
+          welcomeMessageText: "مرحباً بك في المجموعة! نتمنى لك وقتاً ممتعاً معنا.",
+          welcomeMessageEnabled: true,
+          autoDeleteMessagesAfterHours: 24,
+          points: 0,
+        });
+
+        // تحديث المستخدم لإضافة المجموعة إلى المفضلة
+        await User.findByIdAndUpdate(userId, {
+          $addToSet: { favoriteGroups: newGroup._id }, // $addToSet لضمان عدم التكرار
+        });
+
+        sendToUser(userSockets, userId, {
+          type: 'create_group_success',
+          group: newGroup,
+        });
+
+      } catch (error) {
+        console.error('Error creating group:', error);
+        sendToUser(userSockets, userId || ws.userId, {
+          type: 'create_group_failed',
+          message: 'حدث خطأ أثناء إنشاء المجموعة',
+        });
+      }
+
+      break;
+    }
+
+case 'get_user_groups': {
+  const { userId } = msg;
+
+  if (!userId) {
+    sendToUser(userSockets, ws.userId, {
+      type: 'get_user_groups_failed',
+      message: 'يجب تقديم معرف المستخدم.',
+    });
+    break;
+  }
+
+  try {
+    const Group = require('../../models/group');
+
+    // جلب جميع المجموعات التي يكون المستخدم عضوًا فيها
+    const groups = await Group.find({ members: userId }).sort({ updatedAt: -1 });
+
+    sendToUser(userSockets, userId, {
+      type: 'get_user_groups_success',
+      groups,
+    });
+
+  } catch (error) {
+    console.error('Error fetching user groups:', error);
+    sendToUser(userSockets, userId, {
+      type: 'get_user_groups_failed',
+      message: 'حدث خطأ أثناء جلب المجموعات.',
+    });
+  }
+
+  break;
+}
+
+    case 'get_favorite_groups': {
+      const { userId } = msg;
+
+      if (!userId) {
+        sendToUser(userSockets, ws.userId, {
+          type: 'get_favorite_groups_failed',
+          message: 'يجب تقديم معرف المستخدم',
+        });
+        break;
+      }
+
+      try {
+        const User = require('../../models/user');
+        const Group = require('../../models/group');
+
+        const user = await User.findById(userId).lean();
+
+        if (!user) {
+          sendToUser(userSockets, userId, {
+            type: 'get_favorite_groups_failed',
+            message: 'المستخدم غير موجود',
+          });
+          break;
+        }
+
+        // جلب المجموعات المفضلة بالتفاصيل
+        const favoriteGroups = await Group.find({
+          _id: { $in: user.favoriteGroups || [] }
+        }).lean();
+
+        sendToUser(userSockets, userId, {
+          type: 'get_favorite_groups_success',
+          groups: favoriteGroups,
+        });
+
+      } catch (error) {
+        console.error('Error getting favorite groups:', error);
+        sendToUser(userSockets, userId, {
+          type: 'get_favorite_groups_failed',
+          message: 'حدث خطأ أثناء جلب المجموعات المفضلة',
+        });
+      }
+
+      break;
+    }
+
+
+
+
+    case 'group_message': {
+      const { groupId, text, tempId, messageType = 'text' } = msg;
+
+      if (!groupId || !text) {
+        sendToUser(userSockets, ws.userId, {
+          type: 'group_message_failed',
+          tempId,
+          message: 'يجب تقديم معرف الغرفة والنص',
+        });
+        break;
+      }
+
+      try {
+        const Group = require('../../models/group');
+        const User = require('../../models/user');
+        const Message = require('../../models/Message'); // إذا تستخدم نموذج للرسائل
+
+        // البحث عن الغرفة
+        const group = await Group.findById(groupId);
+        if (!group) {
+          sendToUser(userSockets, ws.userId, {
+            type: 'group_message_failed',
+            tempId,
+            message: 'الغرفة غير موجودة',
+          });
+          break;
+        }
+
+        // التحقق إذا كان المرسل عضو في الغرفة
+        if (!group.members.includes(ws.userId)) {
+          sendToUser(userSockets, ws.userId, {
+            type: 'group_message_failed',
+            tempId,
+            message: 'أنت لست عضواً في هذه الغرفة',
+          });
+          break;
+        }
+
+        // حفظ الرسالة في قاعدة البيانات (اختياري)
+        const newMessage = new Message({
+          sender: ws.userId,
+          groupId,
+          text,
+          messageType,
+          timestamp: new Date(),
+          status: 'sent',
+        });
+
+        await newMessage.save();
+
+        // تجهيز الرسالة لإرسالها
+        const messageToSend = {
+          _id: newMessage._id.toString(),
+          sender: ws.userId,
+          groupId,
+          text,
+          messageType,
+          timestamp: newMessage.timestamp.toISOString(),
+          status: 'sent',
+        };
+
+        // إرسال رسالة تأكيد للمرسل
+        sendToUser(userSockets, ws.userId, {
+          type: 'group_message_sent_confirmation',
+          tempId,
+          message: messageToSend,
+        });
+
+        // إرسال الرسالة لكل أعضاء الغرفة المتصلين (بما فيهم المرسل أيضاً)
+        group.members.forEach(userId => {
+          const userWs = userSockets[userId];
+          if (userWs && userWs.readyState === 1) {
+            userWs.send(JSON.stringify({
+              type: 'new_group_message',
+              message: messageToSend,
+            }));
+          }
+        });
+
+      } catch (error) {
+        console.error('Error sending group message:', error);
+        sendToUser(userSockets, ws.userId, {
+          type: 'group_message_failed',
+          tempId,
+          message: 'حدث خطأ أثناء إرسال رسالة الغرفة',
+        });
+      }
+
+      break;
+    }
+    case 'join_group': {
+      const { groupId } = msg;
+
+      if (!groupId) {
+        sendToUser(userSockets, ws.userId, {
+          type: 'join_group_failed',
+          message: 'يجب تقديم معرف الغرفة للانضمام',
+        });
+        break;
+      }
+
+      try {
+        const Group = require('../../models/group');
+        // البحث عن الغرفة
+        const group = await Group.findById(groupId);
+        if (!group) {
+          sendToUser(userSockets, ws.userId, {
+            type: 'join_group_failed',
+            message: 'الغرفة غير موجودة',
+          });
+          break;
+        }
+
+        // التحقق إذا كان المستخدم عضوًا مسبقًا
+        if (group.members.includes(ws.userId)) {
+          sendToUser(userSockets, ws.userId, {
+            type: 'join_group_failed',
+            message: 'أنت عضو بالفعل في هذه الغرفة',
+          });
+          break;
+        }
+
+        // إضافة المستخدم لقائمة الأعضاء
+        group.members.push(ws.userId);
+        await group.save();
+
+        // إرسال تأكيد الانضمام للمستخدم
+        sendToUser(userSockets, ws.userId, {
+          type: 'join_group_success',
+          groupId,
+          message: 'تم الانضمام إلى الغرفة بنجاح',
+        });
+
+        // رسالة نظام تخبر الجميع بانضمام المستخدم
+        const systemMessage = {
+          _id: `sys_${Date.now()}`,  // معرف مؤقت خاص بالرسالة النظامية
+          sender: null,
+          senderType: 'system',
+          groupId,
+          text: `المستخدم ${ws.userId} انضم إلى الغرفة.`,
+          messageType: 'system',
+          timestamp: new Date().toISOString(),
+          status: 'sent',
+        };
+
+        // إرسال رسالة النظام لكل أعضاء الغرفة المتصلين
+        group.members.forEach(userId => {
+          const userWs = userSockets[userId];
+          if (userWs && userWs.readyState === 1) {
+            userWs.send(JSON.stringify({
+              type: 'new_group_message',
+              message: systemMessage,
+            }));
+          }
+        });
+
+      } catch (error) {
+        console.error('Error joining group:', error);
+        sendToUser(userSockets, ws.userId, {
+          type: 'join_group_failed',
+          message: 'حدث خطأ أثناء الانضمام إلى الغرفة',
+        });
+      }
+
+      break;
+    }
+
+    case 'get_all_groups': {
+      try {
+        const Group = require('../../models/group');
+
+        // جلب كل الغرف من قاعدة البيانات
+        const groups = await Group.find({});
+
+        // إرسال كل الغرف إلى المستخدم عبر WebSocket
+        sendToUser(userSockets, ws.userId, {
+          type: 'all_groups',
+          groups,
+        });
+      } catch (error) {
+        console.error('خطأ في جلب الغرف:', error);
+        sendToUser(userSockets, ws.userId, {
+          type: 'get_all_groups_failed',
+          message: 'حدث خطأ أثناء جلب الغرف',
+        });
+      }
       break;
     }
 

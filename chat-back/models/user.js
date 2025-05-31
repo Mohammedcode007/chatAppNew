@@ -98,16 +98,10 @@ const purchaseRecordSchema = new mongoose.Schema({
   paymentMethod: { type: String, default: 'coins' },
 });
 
-const badgeSchema = new mongoose.Schema({
-  badgeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },
-  acquiredAt: { type: Date, default: Date.now },
-  active: { type: Boolean, default: false },
-});
 
-const activeCustomBadgeSchema = new mongoose.Schema({
-  badgeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', default: null },
-  activatedAt: { type: Date, default: null },
-});
+
+
+
 
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
@@ -117,7 +111,7 @@ const userSchema = new mongoose.Schema({
   gender: { type: String, enum: ['male', 'female', 'other'], default: 'male' },
   age: { type: Number, default: 18 },
   birthday: { type: Date, default: () => new Date('2000-01-01') },
-  verified: { type: Boolean, default: true },  // حالة التحقق
+  verified: { type: Boolean, default: false },  // حالة التحقق
 
   country: { type: String, default: 'Unknown' },
   views: { type: Number, default: 0 },
@@ -145,14 +139,14 @@ const userSchema = new mongoose.Schema({
 
   customUsernameColor: { type: String, default: 'black' },  // لون اسم المستخدم
 
-  badges: { type: [badgeSchema], default: [] },
-
-  activeCustomBadge: { type: activeCustomBadgeSchema, default: {} }, // الشارة المفعلة المخصصة
+  badge: { type: String, default: '' },
 
   subscription: {
     plan: { type: String, enum: ['free', 'silver', 'gold', 'vip'], default: 'free' },
     expiresAt: { type: Date, default: null },
   },
+  favoriteGroups: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Group' }],
+
 
   specialWelcomeMessage: { type: String, default: "مرحبا بك في التطبيق!" },  // رسالة ترحيب خاصة
 

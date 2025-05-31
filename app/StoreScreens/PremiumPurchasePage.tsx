@@ -11,6 +11,7 @@ import {
   Button,
   ScrollView,
   Image,
+  TextInput,
 } from "react-native";
 import ColorPicker from "react-native-wheel-color-picker";
 
@@ -191,9 +192,11 @@ export default function PremiumPurchaseScreen() {
   const [purchasedRoomBadges, setPurchasedRoomBadges] = useState<string[]>([]);
   const [selectedRoomBadge, setSelectedRoomBadge] = useState<string | null>(null);
   const [purchasedRoomFeatures, setPurchasedRoomFeatures] = useState<string[]>([]);
+  const [welcomeMessage, setWelcomeMessage] = useState("");
 
   // لعرض القسم الحالي (مستخدم أو غرفة)
   const [activeSection, setActiveSection] = useState<"user" | "room">("user");
+const [selectedBadge, setSelectedBadge] = useState("");
 
   // دالة شراء ميزة مستخدم
   const handlePurchaseUserFeature = (feature: Feature) => {
@@ -203,15 +206,17 @@ export default function PremiumPurchaseScreen() {
       [{ text: "OK" }]
     );
 
-    if (feature.id === "4" && !purchasedUserBadges.includes("customBadge")) {
-      setPurchasedUserBadges([...purchasedUserBadges, "customBadge"]);
-      const badgeId = userCustomBadges[0].id;
-      setSelectedUserBadge(badgeId);
 
-      // تحديث البروفايل
-      updateStoreProfile({ customBadge: badgeId });
+    if (feature.id === "1") {
+      // إذا اشترى المستخدم ميزة لون الاسم
+      updateStoreProfile({ specialWelcomeMessage: welcomeMessage }, 15000);
+
     }
+    if (feature.id === "2") {
+      // إذا اشترى المستخدم ميزة لون الاسم
+      updateStoreProfile({ verified: true }, 8000);
 
+    }
     if (feature.id === "3") {
       // إذا اشترى المستخدم ميزة لون الاسم
       updateStoreProfile({ customUsernameColor: usernameColor }, 1000);
@@ -219,6 +224,11 @@ export default function PremiumPurchaseScreen() {
       setShowColorPicker(true);
     }
 
+      if (feature.id === "4") {
+      // إذا اشترى المستخدم ميزة لون الاسم
+      updateStoreProfile({ badge: selectedBadge }, 8000);
+
+    }
     // مثال على تحديث ميزة تم شراؤها:
     // updateStoreProfile({ purchasedUserFeatures: [...(profile?.purchasedUserFeatures || []), feature.id] });
   };
@@ -385,6 +395,58 @@ export default function PremiumPurchaseScreen() {
           {userPremiumFeatures.map((feature) =>
             renderFeatureItem(feature, selectedUserFeature, setSelectedUserFeature)
           )}
+         {selectedUserFeature?.id === "4" && (
+  <View style={{ marginVertical: 10 }}>
+    <Text style={{ marginBottom: 10, fontWeight: "bold", fontSize: 16 }}>
+      اختر البادج الذي يظهر بجانب اسمك
+    </Text>
+
+    <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center" }}>
+      {[
+        "🐉", "🐲", "🔥", "💀", "👑", "🦄", "🧙‍♂️", "🧚‍♀️", "🧛‍♂️", "🧞‍♂️",
+        "👺", "👹", "👻", "😈", "⚔️", "🛡️", "🌟", "💫", "✨", "🎯",
+        "🚀", "🛰️", "🛸", "🌈", "⛈️", "🌪️", "❄️", "☄️", "🪄", "🧿",
+        "🔮", "🧠", "🕷️", "🦂", "🦍", "🦁", "🐺", "🐯", "🦅", "🐸",
+        "🐍", "🦊", "🐘", "🦓", "🦕", "🦖", "🐾", "💎", "🧊", "👽",
+        "🪐", "📿", "🎮", "🏆", "🥇", "🪙"
+      ].map((emoji, index) => (
+        <Text
+          key={index}
+          onPress={() => setSelectedBadge(emoji)}
+          style={{
+            fontSize: 26,
+            margin: 6,
+            padding: 8,
+            borderRadius: 8,
+            borderWidth: selectedBadge === emoji ? 2 : 1,
+            borderColor: selectedBadge === emoji ? "#007bff" : "#ccc",
+            backgroundColor: selectedBadge === emoji ? "#e6f0ff" : "#fff",
+          }}
+        >
+          {emoji}
+        </Text>
+      ))}
+    </View>
+
+    <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 10 }}>المعاينة:</Text>
+    <View
+      style={{
+        padding: 10,
+        borderWidth: 1,
+        borderColor: "#eee",
+        backgroundColor: "#f9f9f9",
+        borderRadius: 8,
+        marginTop: 5,
+        flexDirection: "row",
+        alignItems: "center",
+      }}
+    >
+      <Text style={{ fontSize: 18 }}>{selectedBadge || "🧢"}</Text>
+      <Text style={{ fontSize: 16, marginLeft: 10 }}>اسم المستخدم</Text>
+    </View>
+  </View>
+)}
+
 
           {/* اختيار لون اسم المستخدم */}
           {selectedUserFeature?.id === "3" && (

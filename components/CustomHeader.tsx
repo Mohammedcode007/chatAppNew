@@ -63,7 +63,8 @@ export default function CustomHeader() {
   // عند الضغط على إضافة جروب
   const onAddGroup = () => {
     closeModal();
-    alert('Opening Add Group screen...');
+    
+    router.push('/CreateGroup'); // غيّر المسار حسب اسم الملف الفعلي للصفحة
   };
   const onAddreqFriends = () => {
     closeModal();

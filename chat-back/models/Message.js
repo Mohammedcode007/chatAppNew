@@ -24,13 +24,26 @@ const mediaExtensions = {
 };
 
 const messageSchema = new mongoose.Schema({
-  sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  // sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    sender: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: function () {
+      return this.senderType === 'user'; // مطلوب فقط لو المرسل مستخدم
+    }
+  },
   receiver: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   messageType: {
     type: String,
     enum: ['text', 'image', 'sound', 'video', 'gif'],
     default: 'text',
     required: true
+  },
+    senderType: {
+    type: String,
+    enum: ['user', 'system'],
+    default: 'user',
+    required: false  // ✅ مطلوب لتحديد نوع المُرسل
   },
   text: {
     type: String,

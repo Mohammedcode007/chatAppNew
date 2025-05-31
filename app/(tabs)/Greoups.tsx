@@ -14,6 +14,9 @@ import { Ionicons } from '@expo/vector-icons';
 import CustomHeader from '@/components/CustomHeader';
 import i18n from '@/i18n'; // نفترض ملف إعدادات الترجمة
 import { useThemeMode } from '@/context/ThemeContext';
+import { useAllGroups } from '@/Hooks/useAllGroups';
+import { useFavoriteGroups } from '@/Hooks/useFavoriteGroups';
+import { useUserGroups } from '@/Hooks/useUserGroups';
 
 const initialGroupChats = [
   {
@@ -45,7 +48,56 @@ export default function GroupChatsScreen() {
   const { darkMode, toggleDarkMode } = useThemeMode();
   const isRTL = language === 'ar';
   const router = useRouter();
+  const [selectedTab, setSelectedTab] = useState<'favorite' | 'active' | 'popular'>('active');
+  const [userData, setUserData] = useState<any>(null);
 
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const userDataString = await AsyncStorage.getItem('userData');
+        if (userDataString) {
+          const userData = JSON.parse(userDataString);
+          setUserData(userData);
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchToken = async () => {
+      try {
+        const storedToken = await AsyncStorage.getItem('authToken');
+        if (storedToken) {
+          setToken(storedToken);
+        }
+      } catch (error) {
+        console.error('فشل في جلب التوكن:', error);
+      }
+    };
+
+    fetchToken();
+  }, []);
+
+  const { groups, loading, error, fetchGroups } = useAllGroups(userData?._id);
+  const { groups: favoriteGroups, loading: loadingFavorites, error: errorFavorites, fetchFavoriteGroups } = useFavoriteGroups(userData?._id);
+const { groups: userGroups, loading: loadingUserGroups, error: errorUserGroups, fetchUserGroups } = useUserGroups(userData?._id);
+
+useEffect(() => {
+  if (userData?._id) {
+    if (selectedTab === 'favorite') {
+      fetchFavoriteGroups();
+    } else if (selectedTab === 'popular') {
+      fetchGroups();
+    } else if (selectedTab === 'active') {
+      fetchUserGroups();
+    }
+  }
+}, [userData?._id, selectedTab]);
   useEffect(() => {
     const getStoredLang = async () => {
       const lang = await AsyncStorage.getItem('appLanguage');
@@ -72,32 +124,48 @@ export default function GroupChatsScreen() {
   const handleLeave = (id: string) => {
     setGroupChats((prev) => prev.filter((group) => group.id !== id));
   };
+const selectedChats =
+  selectedTab === 'popular'
+    ? groups
+    : selectedTab === 'favorite'
+      ? favoriteGroups
+      : selectedTab === 'active'   // هنا نتحقق إذا التبويب نشط للمجموعات الخاصة بالمستخدم
+        ? userGroups
+        : groupChats;
 
-  const renderItem = ({ item }: { item: typeof initialGroupChats[0] }) => {
-    const displayAvatars = item.members.slice(0, 2);
-    const remaining = item.membersCount - displayAvatars.length;
+
+  const renderItem = ({ item }: { item: any }) => {
+    const displayAvatars = (item.members || []).slice(0, 2);
+    const remaining = (item.members?.length || 0) - displayAvatars.length;
 
     return (
       <TouchableOpacity
         style={[styles.card, darkMode && styles.cardDark, isRTL && styles.rtlRow]}
         onPress={() =>
-          router.push(`/group/${item.id}?name=${encodeURIComponent(item.name)}`)
+          router.push(`/group/${item._id}?name=${encodeURIComponent(item.name)}`)
         }
       >
         <View style={[styles.row, isRTL && styles.rtlRow]}>
           <View style={[styles.avatarsRow, isRTL && styles.rtlAvatarsRow]}>
-            {displayAvatars.map((member, index) => (
-              <Image
-                key={member.id}
-                source={{ uri: member.avatar }}
-                style={[
-                  styles.avatar,
-                  isRTL
-                    ? { marginRight: index === 0 ? 0 : -30 }
-                    : { marginLeft: index === 0 ? 0 : -30 },
-                ]}
-              />
-            ))}
+            {displayAvatars.map((member: any, index: number) => {
+              
+              const key = typeof member === 'object' && member._id ? member._id : `avatar-${index}`;
+              return (
+                <Image
+                  key={key}
+                  source={{
+                    uri: member?.avatar || 'https://via.placeholder.com/50',
+                  }}
+                  style={[
+                    styles.avatar,
+                    isRTL
+                      ? { marginRight: index === 0 ? 0 : -30 }
+                      : { marginLeft: index === 0 ? 0 : -30 },
+                  ]}
+                />
+              );
+            })}
+
             {remaining > 0 && (
               <View
                 style={[
@@ -130,7 +198,7 @@ export default function GroupChatsScreen() {
                   style={{ marginRight: isRTL ? 0 : 4, marginLeft: isRTL ? 4 : 0 }}
                 />
                 <Text style={[styles.membersCount, darkMode && styles.textDark]}>
-                  {item.membersCount}
+                  {item.members?.length || 0}
                 </Text>
               </View>
             </View>
@@ -139,13 +207,14 @@ export default function GroupChatsScreen() {
               numberOfLines={1}
               ellipsizeMode="tail"
             >
-              {i18n.t('Last message')}: {item.lastMessage}
+              {i18n.t('Last message')}: {item.lastMessage || '—'}
             </Text>
           </View>
         </View>
       </TouchableOpacity>
     );
   };
+
 
   const renderHiddenItem = (data: any) => (
     <View style={[styles.hiddenRow, isRTL && styles.rtlHiddenRow]}>
@@ -170,18 +239,60 @@ export default function GroupChatsScreen() {
     </View>
   );
 
+  const tabOptions = [
+    { key: 'active', label: 'Active', icon: 'chatbubble-ellipses-outline' },
+    { key: 'favorite', label: 'Favorite', icon: 'star-outline' },
+    { key: 'popular', label: 'Popular', icon: 'flame-outline' },
+  ];
+
   return (
     <View style={[styles.container, darkMode && styles.containerDark]}>
       <CustomHeader />
+      <View style={[styles.tabs, isRTL && styles.rtlTabs]}>
+        {tabOptions.map((tab) => {
+          const isActive = selectedTab === tab.key;
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              onPress={() => setSelectedTab(tab.key as any)}
+              style={[styles.tabButton, isActive && styles.tabButtonActive]}
+            >
+              <Ionicons
+                name={tab.icon as keyof typeof Ionicons.glyphMap}
+                size={20}
+                color={isActive ? '#007aff' : darkMode ? '#ccc' : '#888'}
+              />
+              <Text
+                style={[
+                  styles.tabText,
+                  {
+                    color: isActive ? '#007aff' : darkMode ? '#ccc' : '#888',
+                    fontWeight: isActive ? 'bold' : 'normal',
+                  },
+                ]}
+              >
+                {tab.label}
+              </Text>
+              {isActive && <View style={styles.tabIndicator} />}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+
+
       <SwipeListView
-        data={groupChats}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
+        data={selectedChats}
+
+        keyExtractor={(item) => {
+          return item._id;
+        }} renderItem={renderItem}
         renderHiddenItem={renderHiddenItem}
         leftOpenValue={240}
         stopLeftSwipe={240}
         disableRightSwipe={false}
         closeOnRowPress={false}
+
         closeOnScroll={false}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         contentContainerStyle={{ paddingVertical: 8 }}
@@ -235,6 +346,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#ddd',
   },
+
   remainingText: {
     fontSize: 12,
     fontWeight: 'bold',
@@ -310,4 +422,60 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
+  tabsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: '#f5f5f5',
+    paddingVertical: 5,
+    borderBottomWidth: 1,
+    borderColor: '#ddd',
+  },
+  tabButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: '#e0e0e0',
+    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  tabButtonActive: {
+    backgroundColor: '#7A3DA3', // لون بنفسجي قريب من #6A2D91
+  },
+  tabText: {
+    color: '#FFF',
+    fontWeight: '500',
+  },
+  tabTextActive: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  tabButtonRTL: {
+    flexDirection: 'row-reverse',
+  },
+  tabs: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
+  },
+  rtlTabs: {
+    flexDirection: 'row-reverse',
+  },
+
+
+  tabIndicator: {
+    height: 2,
+    backgroundColor: '#007aff',
+    width: '60%',
+    borderRadius: 2,
+    position: 'absolute',
+    bottom: 0,
+  },
+
+
+
 });

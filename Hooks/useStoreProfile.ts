@@ -16,7 +16,7 @@ interface StoreProfileUpdatePayload {
   selectedEffect?: string | null;
   selectedBackground?: string | null;
   customUsernameColor?: string;
-  badges?: string[];
+  badge?: string;
   activeCustomBadge?: string;
   subscription?: any;
   specialWelcomeMessage?: string;
@@ -25,6 +25,8 @@ interface StoreProfileUpdatePayload {
   roomBadge?: string;
   customBadge?: string;
   purchasedUserFeatures?: string[];
+    verified?: boolean; // ✅ تمت إضافته هنا
+
   cost?: number;  // إضافة cost هنا كحقل اختياري
 }
 
