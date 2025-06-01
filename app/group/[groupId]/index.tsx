@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -12,175 +12,132 @@ import {
 import { Text } from '@/components/Themed';
 import { useLocalSearchParams } from 'expo-router';
 import { useThemeMode } from '@/context/ThemeContext';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import { Audio } from 'expo-av';
+import { Ionicons } from '@expo/vector-icons';
 import AudioMessagePlayer from '@/components/AudioMessagePlayer';
 import { useNavigation } from 'expo-router';
-import { useLayoutEffect } from 'react';
 import GroupHeader from '@/components/GroupHeader';
+import { useGroupMessages } from '@/Hooks/useGroupMessages';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 type Message = {
-  id: string;
+  _id: string; // المعرف الحقيقي أو معرف وهمي يبدأ بـ "temp-"
   type: 'text' | 'image' | 'audio';
-  content: string;
+  text: string;
   sender: string;
   timestamp: number;
+  isTemporary?: boolean; // رسالة مؤقتة
+};
+
+const formatTime = (timestamp: number): string => {
+  const date = new Date(timestamp);
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const isAM = hours < 12;
+  const formattedHours = (hours % 12 || 12).toString().padStart(2, '0');
+  const formattedMinutes = minutes.toString().padStart(2, '0');
+  const period = isAM ? 'ص' : 'م';
+  return `${formattedHours}:${formattedMinutes} ${period}`;
 };
 
 export default function GroupChatScreen() {
   const { groupId, name } = useLocalSearchParams<{ groupId: string; name?: string }>();
   const { darkMode } = useThemeMode();
+  const [userData, setUserData] = useState<any>(null);
 
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { messages, loading, error, sendMessage } = useGroupMessages(groupId, userData?._id || '');
   const [inputText, setInputText] = useState('');
-  const [sending, setSending] = useState(false);
-
   const flatListRef = useRef<FlatList>(null);
-
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
   const navigation = useNavigation();
+
+  // الحالة التي تحتوي الرسائل المعروضة (بما في ذلك الرسائل الوهمية)
+  const [localMessages, setLocalMessages] = useState<Message[]>([]);
 
   useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
   }, []);
-  useEffect(() => {
-    const initialMessages: Message[] = [
-      {
-        id: '1',
-        type: 'text',
-        content: 'مرحبًا بكم في المجموعة!',
-        sender: 'Admin',
-        timestamp: Date.now() - 60000,
-      },
-      {
-        id: '2',
-        type: 'image',
-        content: 'https://randomuser.me/api/portraits/men/32.jpg',
-        sender: 'Ahmed',
-        timestamp: Date.now() - 30000,
-      },
-    ];
-    setMessages(initialMessages);
-  }, [groupId]);
 
-  const sendTextMessage = () => {
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const userDataString = await AsyncStorage.getItem('userData');
+        if (userDataString) {
+          setUserData(JSON.parse(userDataString));
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+    fetchUserData();
+  }, []);
+
+  // كل مرة تصل رسائل من الخادم (useGroupMessages)، ندمجها مع localMessages
+  useEffect(() => {
+    // الرسائل التي ليست وهمية مع المعرف الحقيقي فقط
+    const realMessages = messages.map((msg: any) => ({
+      _id: msg._id,
+      type: msg.messageType,
+      text: msg.text,
+      sender: msg.sender,
+      timestamp: new Date(msg.timestamp).getTime(),
+      isTemporary: false,
+    }));
+
+    setLocalMessages((prev) => {
+      // استبعاد الرسائل الوهمية التي تم استبدالها برسائل حقيقية
+      const realIds = realMessages.map(m => m._id);
+      const filteredPrev = prev.filter(m =>
+        m.isTemporary && !realIds.includes(m._id.replace('temp-', ''))
+      );
+
+      // دمج الرسائل الحقيقية مع الوهمية المتبقية
+      const combined = [...filteredPrev, ...realMessages];
+
+      // فرز حسب التوقيت
+      combined.sort((a, b) => a.timestamp - b.timestamp);
+
+      return combined;
+    });
+  }, [messages]);
+
+  // إرسال رسالة نصية
+  const sendTextMessage = async () => {
     if (!inputText.trim()) return;
 
-    setSending(true);
-    const newMessage: Message = {
-      id: Date.now().toString(),
+    const tempId = `temp-${Date.now()}`;
+
+    const newTempMessage: Message = {
+      _id: tempId,
       type: 'text',
-      content: inputText.trim(),
-      sender: 'You',
+      text: inputText.trim(),
+      sender: userData?._id || 'unknown',
       timestamp: Date.now(),
+      isTemporary: true,
     };
-    setMessages((prev) => [...prev, newMessage]);
+
+    // عرض الرسالة الوهمية فوراً
+    // setLocalMessages(prev => [...prev, newTempMessage]);
     setInputText('');
-    setSending(false);
-
-    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-  };
-
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-      allowsEditing: true,
-    });
-
-    if (!result.canceled && result.assets.length > 0) {
-      const imageUri = result.assets[0].uri;
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        type: 'image',
-        content: imageUri,
-        sender: 'You',
-        timestamp: Date.now(),
-      };
-      setMessages((prev) => [...prev, newMessage]);
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-    }
-  };
-
-  const startRecording = async () => {
-    try {
-      const permission = await Audio.requestPermissionsAsync();
-      if (permission.status !== 'granted') {
-        alert('يرجى السماح بالوصول إلى الميكروفون');
-        return;
-      }
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      const recording = new Audio.Recording();
-
-      const recordingOptions = {
-        android: {
-          extension: '.m4a',
-          outputFormat: 2,
-          audioEncoder: 3,
-          sampleRate: 44100,
-          numberOfChannels: 2,
-          bitRate: 128000,
-        },
-        ios: {
-          extension: '.caf',
-          audioQuality: 127,
-          sampleRate: 44100,
-          numberOfChannels: 2,
-          bitRate: 128000,
-          linearPCMBitDepth: 16,
-          linearPCMIsBigEndian: false,
-          linearPCMIsFloat: false,
-        },
-        web: { mimeType: 'audio/webm', bitsPerSecond: 128000 },
-      };
-
-      await recording.prepareToRecordAsync(recordingOptions);
-      await recording.startAsync();
-
-      setRecording(recording);
-      setIsRecording(true);
-    } catch (error) {
-      console.error('حدث خطأ أثناء التسجيل:', error);
-    }
-  };
-
-  const stopRecording = async () => {
-    if (!recording) return;
 
     try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      setRecording(null);
-      setIsRecording(false);
-
-      if (uri) {
-        const newMessage: Message = {
-          id: Date.now().toString(),
-          type: 'audio',
-          content: uri,
-          sender: 'You',
-          timestamp: Date.now(),
-        };
-        setMessages((prev) => [...prev, newMessage]);
-        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-      }
+      // انتظار تأكيد الإرسال (تأكد أن sendMessage يعيد Promise<رسالة>)
+      await sendMessage(inputText.trim(), 'text');
+      // لن تحتاج لتعديل هنا لأن useEffect سيراقب messages ويحدث localMessages
     } catch (error) {
-      console.error('خطأ في إيقاف التسجيل:', error);
+      // حذف الرسالة الوهمية عند فشل الإرسال
+      setLocalMessages(prev => prev.filter(m => m._id !== tempId));
+      console.error('Failed to send message:', error);
+      // يمكنك عرض رسالة خطأ للمستخدم حسب الحاجة
     }
+
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 150);
   };
 
+  // عرض الرسالة
   const renderMessage = ({ item }: { item: Message }) => {
-    const isMyMessage = item.sender === 'You';
+    const isMyMessage = item.sender === userData?._id;
 
     return (
-      <View style={{ marginBottom: 2 }}>
-        {/* 👤 اسم المرسل */}
+      <View style={{ marginBottom: 8, opacity: item.isTemporary ? 0.6 : 1 }}>
         <Text
           style={{
             fontSize: 13,
@@ -192,7 +149,6 @@ export default function GroupChatScreen() {
           {isMyMessage ? 'أنت' : item.sender}
         </Text>
 
-        {/* 💬 الرسالة نفسها */}
         <View
           style={[
             styles.messageContainer,
@@ -202,26 +158,33 @@ export default function GroupChatScreen() {
         >
           {item.type === 'text' && (
             <Text style={[styles.messageText, darkMode && { color: '#fff' }]}>
-              {item.content}
+              {item.text}
             </Text>
           )}
 
           {item.type === 'image' && (
-            <Image
-              source={{ uri: item.content }}
-              style={styles.imageMessage}
-              resizeMode="cover"
-            />
+            <Image source={{ uri: item.text }} style={styles.imageMessage} resizeMode="cover" />
           )}
 
           {item.type === 'audio' && (
-            <AudioMessagePlayer uri={item.content} isMyMessage={isMyMessage} />
+            <AudioMessagePlayer uri={item.text} isMyMessage={isMyMessage} />
           )}
+
+          <Text
+            style={{
+              fontSize: 11,
+              color: darkMode ? '#aaa' : '#999',
+              alignSelf: isMyMessage ? 'flex-end' : 'flex-start',
+              marginTop: 2,
+              marginHorizontal: 4,
+            }}
+          >
+            {formatTime(item.timestamp)}
+          </Text>
         </View>
       </View>
     );
   };
-
 
   return (
     <KeyboardAvoidingView
@@ -229,23 +192,19 @@ export default function GroupChatScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={90}
     >
-      <GroupHeader title={name || 'Group Chat'} membersCount={12} settingId="45" />
-
+      <GroupHeader title={name || 'المجموعة'} membersCount={12} settingId="45" />
 
       <FlatList
         ref={flatListRef}
-        data={messages}
-        keyExtractor={(item) => item.id}
+        data={localMessages}
+        keyExtractor={(item) => item._id}
         renderItem={renderMessage}
         contentContainerStyle={styles.messagesList}
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
       />
 
       <View style={[styles.inputContainer, darkMode && { backgroundColor: '#222' }]}>
-        <TouchableOpacity onPress={pickImage} style={styles.iconButton}>
-          <Ionicons name="image" size={28} color={darkMode ? '#fff' : '#000'} />
-        </TouchableOpacity>
-
         <TextInput
           style={[styles.textInput, darkMode && { color: '#fff' }]}
           value={inputText}
@@ -255,22 +214,16 @@ export default function GroupChatScreen() {
           multiline
         />
 
-        {isRecording ? (
-          <TouchableOpacity onPress={stopRecording} style={styles.iconButton}>
-            <MaterialIcons name="stop-circle" size={32} color="red" />
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity onPress={startRecording} style={styles.iconButton}>
-            <Ionicons name="mic" size={28} color={darkMode ? '#fff' : '#000'} />
-          </TouchableOpacity>
-        )}
-
         <TouchableOpacity
           onPress={sendTextMessage}
           style={[styles.iconButton, { marginLeft: 8 }]}
-          disabled={sending}
+          disabled={!inputText.trim()}
         >
-          <Ionicons name="send" size={28} color={inputText.trim() ? (darkMode ? '#0af' : '#007aff') : '#ccc'} />
+          <Ionicons
+            name="send"
+            size={28}
+            color={inputText.trim() ? (darkMode ? '#0af' : '#007aff') : '#ccc'}
+          />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -279,25 +232,13 @@ export default function GroupChatScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
-    backgroundColor: '#f5f5f5',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000',
-  },
   messagesList: {
     padding: 16,
     paddingBottom: 10,
   },
   messageContainer: {
     marginBottom: 2,
-    padding: 4,
+    padding: 8,
     borderRadius: 18,
     maxWidth: '80%',
     shadowColor: '#000',
@@ -321,26 +262,26 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   imageMessage: {
-    width: 180,
-    height: 120,
+    width: 200,
+    height: 150,
     borderRadius: 12,
   },
   inputContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    alignItems: 'center',
+    padding: 8,
     borderTopWidth: 1,
-    borderTopColor: '#ccc',
+    borderColor: '#ddd',
     backgroundColor: '#fff',
   },
   textInput: {
     flex: 1,
     fontSize: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    maxHeight: 100,
   },
   iconButton: {
-    marginHorizontal: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

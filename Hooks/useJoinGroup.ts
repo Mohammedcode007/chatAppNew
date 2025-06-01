@@ -1,36 +1,35 @@
 import { useEffect, useState } from 'react';
 import { useWebSocket } from '@/context/WebSocketContext';
 
-interface CreateGroupResponse {
+interface JoinGroupResponse {
   type: string;
-  group?: any;
+  groupId?: string;
   message?: string;
 }
 
-export function useCreateGroup(userId: string, token: string | null) {
+export function useJoinGroup(userId: string) {
   const { ws } = useWebSocket();
-  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [group, setGroup] = useState<any>(null);
+  const [joinedGroupId, setJoinedGroupId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ws.current) return;
 
     const handleMessage = (event: MessageEvent) => {
       try {
-        const data: CreateGroupResponse = JSON.parse(event.data);
+        const data: JoinGroupResponse = JSON.parse(event.data);
 
-        if (data.type === 'create_group_success' && data.group) {
-          setGroup(data.group);
-          setSuccessMessage('تم إنشاء المجموعة بنجاح');
+        if (data.type === 'join_group_success' && data.groupId) {
+          setJoinedGroupId(data.groupId);
+          setSuccessMessage('تم الانضمام إلى المجموعة بنجاح');
           setLoading(false);
           setError(null);
         }
 
-        if (data.type === 'create_group_failed') {
-          setError(data.message || 'فشل إنشاء المجموعة');
+        if (data.type === 'join_group_failed') {
+          setError(data.message || 'فشل الانضمام إلى المجموعة');
           setLoading(false);
         }
       } catch (err) {
@@ -45,37 +44,37 @@ export function useCreateGroup(userId: string, token: string | null) {
     };
   }, [ws]);
 
-  const createGroup = (groupName: string) => {
+  const joinGroup = (groupId: string) => {
+    
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
       setError('WebSocket غير متصل');
       return;
     }
 
-    if (!groupName.trim()) {
-      setError('اسم المجموعة لا يمكن أن يكون فارغًا');
+    if (!groupId.trim()) {
+      setError('معرف المجموعة لا يمكن أن يكون فارغًا');
       return;
     }
 
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
-    setGroup(null);
+    setJoinedGroupId(null);
 
     const message = {
-      type: 'create_group',
-      groupName,
+      type: 'join_group',
+      groupId,
       userId,
-      token,
     };
 
     ws.current.send(JSON.stringify(message));
   };
 
   return {
-    group,
+    joinedGroupId,
     loading,
     error,
     successMessage,
-    createGroup,
+    joinGroup,
   };
 }

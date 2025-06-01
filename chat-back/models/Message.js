@@ -32,7 +32,7 @@ const messageSchema = new mongoose.Schema({
       return this.senderType === 'user'; // مطلوب فقط لو المرسل مستخدم
     }
   },
-  receiver: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  receiver: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false },
   messageType: {
     type: String,
     enum: ['text', 'image', 'sound', 'video', 'gif'],

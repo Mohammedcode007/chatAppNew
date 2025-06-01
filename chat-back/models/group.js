@@ -17,15 +17,15 @@ const groupSchema = new mongoose.Schema({
   creator: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
   // الرسائل كمصفوفة من مراجع Message
-  messages: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Message' }],
+  messages: [{ type: mongoose.Schema.Types.ObjectId, ref: 'GroupMessage' }],
 
-  lastMessage: { type: mongoose.Schema.Types.ObjectId, ref: 'Message', default: null },
+  lastMessage: { type: mongoose.Schema.Types.ObjectId, ref: 'GroupMessage', default: null },
 
   logs: [{ type: String }],
 
   inviteLink: { type: String, default: '' },
 
-  pinMessage: { type: mongoose.Schema.Types.ObjectId, ref: 'Message', default: null },
+  pinMessage: { type: mongoose.Schema.Types.ObjectId, ref: 'GroupMessage', default: null },
 
   welcomeMessageText: { 
     type: String, 

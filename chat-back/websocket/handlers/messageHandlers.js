@@ -27,6 +27,9 @@ async function handleMessage(message, ws, userSockets) {
 
     // إرسال طلب صداقة
     case 'friend_request_sent': {
+      if (!msg.toUserId || !msg.toUserId) {
+        return;
+      }
       const toUser = await User.findById(msg.toUserId);
       if (!toUser) return;
 
@@ -323,6 +326,9 @@ async function handleMessage(message, ws, userSockets) {
       }
 
       try {
+        if (!userId) {
+          return;
+        }
         const user = await User.findById(userId);
 
         if (!user) {
@@ -383,7 +389,9 @@ async function handleMessage(message, ws, userSockets) {
 
         cost, // سعر التحديث (عدد العملات)
       } = msg;
-
+      if (!userId) {
+        return;
+      }
       // البحث عن المستخدم حسب المعرف
       const user = await User.findById(userId)
         .populate('selectedAvatar selectedFrame selectedEffect selectedBackground')
@@ -471,7 +479,9 @@ async function handleMessage(message, ws, userSockets) {
 
     case 'private_message': {
       const { toUserId, text, tempId, messageType = 'text' } = msg; // استخراج نوع الرسالة مع قيمة افتراضية
-
+      if (!toUserId || !ws.userId) {
+        return;
+      }
       // التحقق من وجود المرسل والمستلم
       const sender = await User.findById(ws.userId);
       const receiver = await User.findById(toUserId);
@@ -557,7 +567,9 @@ async function handleMessage(message, ws, userSockets) {
             receiver: toUserId,
             status: { $ne: 'seen' },
           });
-
+          if (!ws.userId) {
+            return;
+          }
           const senderUser = await User.findById(ws.userId, 'username avatarUrl').lean();
 
           sendToUser(userSockets, toUserId, {
@@ -661,7 +673,7 @@ async function handleMessage(message, ws, userSockets) {
       }
 
       // تأكد أن المستخدم الحالي هو المستقبل
-      if (message.receiver.toString() !== ws.userId) {
+      if (message?.receiver?.toString() !== ws.userId) {
         return;
       }
 
@@ -769,7 +781,7 @@ async function handleMessage(message, ws, userSockets) {
 
       allMessages.forEach(message => {
         const otherUserId = message.sender.toString() === ws.userId
-          ? message.receiver.toString()
+          ? message?.receiver?.toString()
           : message.sender.toString();
 
         if (!conversationsMap[otherUserId]) {
@@ -784,7 +796,7 @@ async function handleMessage(message, ws, userSockets) {
         conversationsMap[otherUserId].lastMessage = message;
 
         if (
-          message.receiver.toString() === ws.userId &&
+          message?.receiver?.toString() === ws.userId &&
           message.status !== 'seen'
         ) {
           conversationsMap[otherUserId].unreadCount++;
@@ -825,7 +837,7 @@ async function handleMessage(message, ws, userSockets) {
           lastMessage: {
             _id: convo.lastMessage._id.toString(),
             sender: convo.lastMessage.sender.toString(),
-            receiver: convo.lastMessage.receiver.toString(),
+            receiver: convo?.lastMessage?.receiver?.toString(),
             text: convo.lastMessage.text,
             timestamp: convo.lastMessage.timestamp,
             status: convo.lastMessage.status,
@@ -854,7 +866,9 @@ async function handleMessage(message, ws, userSockets) {
       const { targetUserId } = msg;
 
       if (!targetUserId) return;
-
+      if (!targetUserId || !ws.userId) {
+        return;
+      }
       const user = await User.findById(ws.userId);
       const targetUser = await User.findById(targetUserId);
 
@@ -890,7 +904,9 @@ async function handleMessage(message, ws, userSockets) {
       const { targetUserId } = msg;
 
       if (!targetUserId) return;
-
+      if (!ws.userId) {
+        return;
+      }
       const user = await User.findById(ws.userId);
 
       if (!user) {
@@ -924,6 +940,9 @@ async function handleMessage(message, ws, userSockets) {
     }
 
     case 'get_blocked_users': {
+      if (!ws.userId) {
+        return;
+      }
       const user = await User.findById(ws.userId);
 
       if (!user) {
@@ -1020,38 +1039,38 @@ async function handleMessage(message, ws, userSockets) {
       break;
     }
 
-case 'get_user_groups': {
-  const { userId } = msg;
+    case 'get_user_groups': {
+      const { userId } = msg;
 
-  if (!userId) {
-    sendToUser(userSockets, ws.userId, {
-      type: 'get_user_groups_failed',
-      message: 'يجب تقديم معرف المستخدم.',
-    });
-    break;
-  }
+      if (!userId) {
+        sendToUser(userSockets, ws.userId, {
+          type: 'get_user_groups_failed',
+          message: 'يجب تقديم معرف المستخدم.',
+        });
+        break;
+      }
 
-  try {
-    const Group = require('../../models/group');
+      try {
+        const Group = require('../../models/group');
 
-    // جلب جميع المجموعات التي يكون المستخدم عضوًا فيها
-    const groups = await Group.find({ members: userId }).sort({ updatedAt: -1 });
+        // جلب جميع المجموعات التي يكون المستخدم عضوًا فيها
+        const groups = await Group.find({ members: userId }).sort({ updatedAt: -1 });
 
-    sendToUser(userSockets, userId, {
-      type: 'get_user_groups_success',
-      groups,
-    });
+        sendToUser(userSockets, userId, {
+          type: 'get_user_groups_success',
+          groups,
+        });
 
-  } catch (error) {
-    console.error('Error fetching user groups:', error);
-    sendToUser(userSockets, userId, {
-      type: 'get_user_groups_failed',
-      message: 'حدث خطأ أثناء جلب المجموعات.',
-    });
-  }
+      } catch (error) {
+        console.error('Error fetching user groups:', error);
+        sendToUser(userSockets, userId, {
+          type: 'get_user_groups_failed',
+          message: 'حدث خطأ أثناء جلب المجموعات.',
+        });
+      }
 
-  break;
-}
+      break;
+    }
 
     case 'get_favorite_groups': {
       const { userId } = msg;
@@ -1067,7 +1086,9 @@ case 'get_user_groups': {
       try {
         const User = require('../../models/user');
         const Group = require('../../models/group');
-
+        if (!userId) {
+          return;
+        }
         const user = await User.findById(userId).lean();
 
         if (!user) {
@@ -1102,154 +1123,268 @@ case 'get_user_groups': {
 
 
 
-    case 'group_message': {
-      const { groupId, text, tempId, messageType = 'text' } = msg;
+    case 'fetch_group_messages': {
+      const { groupId } = msg;
 
-      if (!groupId || !text) {
+      if (!groupId) {
         sendToUser(userSockets, ws.userId, {
-          type: 'group_message_failed',
-          tempId,
-          message: 'يجب تقديم معرف الغرفة والنص',
+          type: 'fetch_group_messages_failed',
+          message: 'يجب تقديم معرف المجموعة.',
         });
         break;
       }
 
       try {
+        const mongoose = require('mongoose');
         const Group = require('../../models/group');
-        const User = require('../../models/user');
-        const Message = require('../../models/Message'); // إذا تستخدم نموذج للرسائل
+        const GroupMessage = require('../../models/GroupMessage');
 
-        // البحث عن الغرفة
         const group = await Group.findById(groupId);
         if (!group) {
           sendToUser(userSockets, ws.userId, {
-            type: 'group_message_failed',
-            tempId,
-            message: 'الغرفة غير موجودة',
+            type: 'fetch_group_messages_failed',
+            message: 'المجموعة غير موجودة.',
           });
           break;
         }
 
-        // التحقق إذا كان المرسل عضو في الغرفة
-        if (!group.members.includes(ws.userId)) {
+        if (!group.members.some(memberId => memberId.equals(ws.userId))) {
           sendToUser(userSockets, ws.userId, {
-            type: 'group_message_failed',
-            tempId,
-            message: 'أنت لست عضواً في هذه الغرفة',
+            type: 'fetch_group_messages_failed',
+            message: 'أنت لست عضواً في هذه المجموعة.',
           });
           break;
         }
 
-        // حفظ الرسالة في قاعدة البيانات (اختياري)
-        const newMessage = new Message({
-          sender: ws.userId,
-          groupId,
-          text,
-          messageType,
-          timestamp: new Date(),
-          status: 'sent',
-        });
+        const messages = await GroupMessage.find({
+          groupId: new mongoose.Types.ObjectId(groupId)
+        }).sort({ timestamp: 1 }).lean();
 
-        await newMessage.save();
 
-        // تجهيز الرسالة لإرسالها
-        const messageToSend = {
-          _id: newMessage._id.toString(),
-          sender: ws.userId,
-          groupId,
-          text,
-          messageType,
-          timestamp: newMessage.timestamp.toISOString(),
-          status: 'sent',
-        };
+        console.log('Fetched Messages:', messages);
 
-        // إرسال رسالة تأكيد للمرسل
         sendToUser(userSockets, ws.userId, {
-          type: 'group_message_sent_confirmation',
-          tempId,
-          message: messageToSend,
-        });
-
-        // إرسال الرسالة لكل أعضاء الغرفة المتصلين (بما فيهم المرسل أيضاً)
-        group.members.forEach(userId => {
-          const userWs = userSockets[userId];
-          if (userWs && userWs.readyState === 1) {
-            userWs.send(JSON.stringify({
-              type: 'new_group_message',
-              message: messageToSend,
-            }));
-          }
+          type: 'fetch_group_messages_success',
+          groupId,
+          messages,
         });
 
       } catch (error) {
-        console.error('Error sending group message:', error);
+        console.error('Error fetching group messages:', error);
         sendToUser(userSockets, ws.userId, {
-          type: 'group_message_failed',
-          tempId,
-          message: 'حدث خطأ أثناء إرسال رسالة الغرفة',
+          type: 'fetch_group_messages_failed',
+          message: 'حدث خطأ أثناء جلب رسائل المجموعة.',
         });
       }
 
       break;
     }
-    case 'join_group': {
+
+   case 'send_group_message': {
+  const { groupId, newMessage, messageType = 'text', tempId } = msg;
+
+  if (!groupId || !newMessage || typeof newMessage !== 'string' || newMessage.trim() === '') {
+    sendToUser(userSockets, ws.userId, {
+      type: 'send_group_message_failed',
+      message: 'بيانات غير مكتملة لإرسال الرسالة.',
+    });
+    break;
+  }
+
+  try {
+    const Group = require('../../models/group');
+    const GroupMessage = require('../../models/GroupMessage');
+
+    const group = await Group.findById(groupId);
+    if (!group) {
+      sendToUser(userSockets, ws.userId, {
+        type: 'send_group_message_failed',
+        message: 'المجموعة غير موجودة.',
+      });
+      break;
+    }
+
+    if (!group.members.includes(ws.userId)) {
+      sendToUser(userSockets, ws.userId, {
+        type: 'send_group_message_failed',
+        message: 'أنت لست عضواً في هذه المجموعة.',
+      });
+      break;
+    }
+
+    const newMsgDoc = new GroupMessage({
+      sender: ws.userId,
+      groupId,
+      text: newMessage.trim(),
+      messageType,
+      timestamp: new Date(),
+      status: 'sent',
+    });
+
+    await newMsgDoc.save();
+
+    // تحديث بيانات المجموعة (مثلاً آخر رسالة)
+    group.lastMessage = newMsgDoc._id;
+    await group.save();
+
+    const messageToSend = {
+      _id: newMsgDoc._id.toString(),
+      sender: ws.userId,
+      groupId,
+      text: newMsgDoc.text,
+      messageType,
+      timestamp: newMsgDoc.timestamp.toISOString(),
+      status: 'sent',
+    };
+
+    // إرسال تأكيد المرسل مع الرسالة الجديدة
+    sendToUser(userSockets, ws.userId, {
+      type: 'group_message_sent_confirmation',
+      tempId,
+      newMessage: messageToSend,
+    });
+
+    // إرسال الرسالة الجديدة لجميع أعضاء المجموعة (بما فيهم المرسل)
+    group.members.forEach(memberId => {
+      const userWs = userSockets[memberId];
+      if (userWs && userWs.readyState === 1) {
+        userWs.send(JSON.stringify({
+          type: 'new_group_message',
+          newMessage: messageToSend,
+          receiver: memberId,
+        }));
+      }
+    });
+
+  } catch (error) {
+    console.error('Error sending group message:', error);
+    sendToUser(userSockets, ws.userId, {
+      type: 'send_group_message_failed',
+      message: 'حدث خطأ أثناء إرسال الرسالة.',
+    });
+  }
+
+  break;
+}
+
+
+
+
+    case 'get_group_members': {
       const { groupId } = msg;
+
+      console.log('Received get_group_members request:', { groupId });
 
       if (!groupId) {
         sendToUser(userSockets, ws.userId, {
-          type: 'join_group_failed',
-          message: 'يجب تقديم معرف الغرفة للانضمام',
+          type: 'get_group_members_failed',
+          message: 'Group ID is required.',
         });
         break;
       }
 
       try {
         const Group = require('../../models/group');
-        // البحث عن الغرفة
+        const User = require('../../models/user'); // إذا أردت جلب بيانات العضو وليس فقط الـ ID
+
+        const group = await Group.findById(groupId).lean();
+
+        if (!group) {
+          sendToUser(userSockets, ws.userId, {
+            type: 'get_group_members_failed',
+            message: 'Group not found.',
+          });
+          break;
+        }
+
+        // جلب بيانات الأعضاء (اختياري: يمكنك استرجاع username, avatar فقط)
+        const membersData = await User.find({ _id: { $in: group.members } }, '_id username avatar').lean();
+
+        sendToUser(userSockets, ws.userId, {
+          type: 'group_members',
+          groupId,
+          members: membersData,
+        });
+      } catch (error) {
+        console.error('Error getting group members:', error);
+        sendToUser(userSockets, ws.userId, {
+          type: 'get_group_members_failed',
+          message: 'An error occurred while fetching group members.',
+        });
+      }
+
+      break;
+    }
+
+    case 'join_group': {
+      const { groupId, userId } = msg;
+
+      console.log('Received join_group request:', { groupId, userId });
+
+      if (!groupId) {
+        sendToUser(userSockets, ws.userId, {
+          type: 'join_group_failed',
+          message: 'Group ID is required to join the group.',
+        });
+        break;
+      }
+
+      if (!userId) {
+        sendToUser(userSockets, ws.userId, {
+          type: 'join_group_failed',
+          message: 'User ID is required to join the group.',
+        });
+        break;
+      }
+
+      try {
+        const Group = require('../../models/group');
+
+        // البحث عن الجروب
         const group = await Group.findById(groupId);
         if (!group) {
           sendToUser(userSockets, ws.userId, {
             type: 'join_group_failed',
-            message: 'الغرفة غير موجودة',
+            message: 'Group not found.',
           });
           break;
         }
 
-        // التحقق إذا كان المستخدم عضوًا مسبقًا
-        if (group.members.includes(ws.userId)) {
+        // التحقق إذا كان المستخدم عضوًا بالفعل
+        if (group.members.includes(userId)) {
           sendToUser(userSockets, ws.userId, {
             type: 'join_group_failed',
-            message: 'أنت عضو بالفعل في هذه الغرفة',
+            message: 'You are already a member of this group.',
           });
           break;
         }
 
-        // إضافة المستخدم لقائمة الأعضاء
-        group.members.push(ws.userId);
+        // إضافة المستخدم إلى أعضاء الجروب
+        group.members.push(userId);
         await group.save();
 
-        // إرسال تأكيد الانضمام للمستخدم
+        // تأكيد الانضمام للمستخدم
         sendToUser(userSockets, ws.userId, {
           type: 'join_group_success',
           groupId,
-          message: 'تم الانضمام إلى الغرفة بنجاح',
+          message: 'You have successfully joined the group.',
         });
 
-        // رسالة نظام تخبر الجميع بانضمام المستخدم
+        // إرسال رسالة نظام لباقي الأعضاء
         const systemMessage = {
-          _id: `sys_${Date.now()}`,  // معرف مؤقت خاص بالرسالة النظامية
+          _id: `sys_${Date.now()}`,
           sender: null,
           senderType: 'system',
           groupId,
-          text: `المستخدم ${ws.userId} انضم إلى الغرفة.`,
+          text: `User ${userId} has joined the group.`,
           messageType: 'system',
           timestamp: new Date().toISOString(),
           status: 'sent',
         };
 
-        // إرسال رسالة النظام لكل أعضاء الغرفة المتصلين
-        group.members.forEach(userId => {
-          const userWs = userSockets[userId];
+        group.members.forEach(memberId => {
+          if (memberId === userId) return; // لا نرسل رسالة للعضو الذي انضم الآن
+          const userWs = userSockets[memberId];
           if (userWs && userWs.readyState === 1) {
             userWs.send(JSON.stringify({
               type: 'new_group_message',
@@ -1262,12 +1397,102 @@ case 'get_user_groups': {
         console.error('Error joining group:', error);
         sendToUser(userSockets, ws.userId, {
           type: 'join_group_failed',
-          message: 'حدث خطأ أثناء الانضمام إلى الغرفة',
+          message: 'An error occurred while trying to join the group.',
         });
       }
 
       break;
     }
+
+    case 'leave_group': {
+      const { groupId, userId } = msg;
+
+      console.log('Received leave_group request:', { groupId, userId });
+
+      if (!groupId) {
+        sendToUser(userSockets, ws.userId, {
+          type: 'leave_group_failed',
+          message: 'Group ID is required to leave the group.',
+        });
+        break;
+      }
+
+      if (!userId) {
+        sendToUser(userSockets, ws.userId, {
+          type: 'leave_group_failed',
+          message: 'User ID is required to leave the group.',
+        });
+        break;
+      }
+
+      try {
+        const Group = require('../../models/group');
+
+        // البحث عن الغرفة
+        const group = await Group.findById(groupId);
+        if (!group) {
+          sendToUser(userSockets, ws.userId, {
+            type: 'leave_group_failed',
+            message: 'Group not found.',
+          });
+          break;
+        }
+
+        // التحقق مما إذا كان المستخدم عضوًا في الغرفة
+        if (!group.members.includes(userId)) {
+          sendToUser(userSockets, ws.userId, {
+            type: 'leave_group_failed',
+            message: 'You are not a member of this group.',
+          });
+          break;
+        }
+
+        // إزالة المستخدم من أعضاء الغرفة (تحويل كل id إلى نص للمقارنة)
+        group.members = group.members.filter(id => id.toString() !== userId.toString());
+
+
+        await group.save();
+
+        // تأكيد للمستخدم
+        sendToUser(userSockets, ws.userId, {
+          type: 'leave_group_success',
+          groupId,
+          message: 'You have successfully left the group.',
+        });
+
+        // إرسال رسالة نظام إلى باقي الأعضاء
+        const systemMessage = {
+          _id: `sys_${Date.now()}`,
+          sender: null,
+          senderType: 'system',
+          groupId,
+          text: `User ${userId} has left the group.`,
+          messageType: 'system',
+          timestamp: new Date().toISOString(),
+          status: 'sent',
+        };
+
+        group.members.forEach(memberId => {
+          const userWs = userSockets[memberId];
+          if (userWs && userWs.readyState === 1) {
+            userWs.send(JSON.stringify({
+              type: 'new_group_message',
+              message: systemMessage,
+            }));
+          }
+        });
+
+      } catch (error) {
+        console.error('Error leaving group:', error);
+        sendToUser(userSockets, ws.userId, {
+          type: 'leave_group_failed',
+          message: 'An error occurred while trying to leave the group.',
+        });
+      }
+
+      break;
+    }
+
 
     case 'get_all_groups': {
       try {

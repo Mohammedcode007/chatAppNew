@@ -7,6 +7,7 @@ const authController = require('./controllers/auth');
 const userController = require('./controllers/userController');
 const friendsController = require('./controllers/friendController');
 const uploadRoutes = require('./routes/upload');
+const Message = require('./models/Message');
 
 
 const { HTTP_PORT, MONGO_URI } = require('./config');
@@ -38,6 +39,18 @@ app.use('/api', uploadRoutes);
 // إنشاء WebSocket server
 createFriendRequestServer(server);
 
+async function deleteMessagesWithoutReceiver() {
+  try {
+    const result = await Message.deleteMany({
+      receiver: { $exists: false }
+    });
+
+    console.log(`تم حذف ${result.deletedCount} رسالة لا تحتوي على حقل receiver.`);
+  } catch (error) {
+    console.error('حدث خطأ أثناء حذف الرسائل:', error);
+  }
+}
+// deleteMessagesWithoutReceiver()
 server.listen(HTTP_PORT, () => {
   console.log(`Server running on port ${HTTP_PORT}`);
 });

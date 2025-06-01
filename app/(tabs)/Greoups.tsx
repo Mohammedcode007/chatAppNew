@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,9 @@ import {
   Image,
   TouchableOpacity,
   I18nManager,
+  Animated,
+  Easing,
+  ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
@@ -17,6 +20,9 @@ import { useThemeMode } from '@/context/ThemeContext';
 import { useAllGroups } from '@/Hooks/useAllGroups';
 import { useFavoriteGroups } from '@/Hooks/useFavoriteGroups';
 import { useUserGroups } from '@/Hooks/useUserGroups';
+import { useLeaveGroup } from '@/Hooks/useLeaveGroup';
+import { useJoinGroup } from '@/Hooks/useJoinGroup';
+import { useGroupMembers } from '@/Hooks/useGroupMembers';
 
 const initialGroupChats = [
   {
@@ -85,19 +91,81 @@ export default function GroupChatsScreen() {
 
   const { groups, loading, error, fetchGroups } = useAllGroups(userData?._id);
   const { groups: favoriteGroups, loading: loadingFavorites, error: errorFavorites, fetchFavoriteGroups } = useFavoriteGroups(userData?._id);
-const { groups: userGroups, loading: loadingUserGroups, error: errorUserGroups, fetchUserGroups } = useUserGroups(userData?._id);
+  const { groups: userGroups, loading: loadingUserGroups, error: errorUserGroups, fetchUserGroups } = useUserGroups(userData?._id);
+  const { leaveGroup: requestLeaveGroup, loading: isLeaving, error: leaveError, successMessage: leaveSuccess } = useLeaveGroup(userData?._id);
+  const { joinGroup, successMessage, joinedGroupId } = useJoinGroup(userData?._id || '');
+  const [groupNameForUrl, setGroupNameForUrl] = useState<string>('');
+  const [selectedGroup, setSelectedGroup] = useState<any>(null);
+  const [shouldJoin, setShouldJoin] = useState(false);
 
+  const { members, loading: loadingMembers, error: membersError } = useGroupMembers(selectedGroup?._id || null);
+
+
+const [loadingGroup, setLoadingGroup] = useState(false);
+
+// تعديل الدالة handleJoin لتفعيل اللودنج عند الضغط:
+const handleJoin = (item: any) => {
+  if (item && item._id) {
+    setLoadingGroup(true);   // بدء التحميل
+    setGroupNameForUrl(item.name);
+    setSelectedGroup(item);
+  } else {
+    console.error('معرف المجموعة غير موجود في العنصر');
+  }
+};
+
+// تعديل useEffect المسؤول عن التوجيه والاشتراك ليوقف اللودنج عند الانتهاء:
 useEffect(() => {
-  if (userData?._id) {
-    if (selectedTab === 'favorite') {
-      fetchFavoriteGroups();
-    } else if (selectedTab === 'popular') {
-      fetchGroups();
-    } else if (selectedTab === 'active') {
-      fetchUserGroups();
+  if (!selectedGroup || !members || !userData) {
+    setLoadingGroup(false);  // توقف اللودنج لو البيانات ناقصة
+    return;
+  }
+
+  const isAlreadyMember = members.some((member: { _id: any }) => member._id === userData._id);
+
+  if (isAlreadyMember) {
+    if (selectedGroup._id && groupNameForUrl) {
+      router.push(`/group/${selectedGroup._id}?name=${encodeURIComponent(groupNameForUrl)}`);
+      setLoadingGroup(false);  // انتهى التحميل وحدث التوجيه
+    } else {
+      console.warn('بيانات المجموعة أو الاسم غير موجودة');
+      setLoadingGroup(false);
+    }
+  } else {
+    setShouldJoin(true);
+    if (selectedGroup._id) {
+      joinGroup(selectedGroup._id);
+    } else {
+      console.error('selectedGroup._id غير موجود');
+      setLoadingGroup(false);
     }
   }
-}, [userData?._id, selectedTab]);
+}, [members, selectedGroup, groupNameForUrl, userData]);
+
+// توقف اللودنج عند نجاح الانضمام أيضاً:
+useEffect(() => {
+  if (shouldJoin && successMessage && joinedGroupId) {
+    router.push(`/group/${joinedGroupId}?name=${encodeURIComponent(groupNameForUrl)}`);
+    setLoadingGroup(false);
+  }
+}, [successMessage, joinedGroupId, groupNameForUrl, shouldJoin]);
+
+
+  const handleLeaveGroup = (groupid: string) => {
+    requestLeaveGroup(groupid);
+  };
+
+  useEffect(() => {
+    if (userData?._id) {
+      if (selectedTab === 'favorite') {
+        fetchFavoriteGroups();
+      } else if (selectedTab === 'popular') {
+        fetchGroups();
+      } else if (selectedTab === 'active') {
+        fetchUserGroups();
+      }
+    }
+  }, [userData?._id, selectedTab]);
   useEffect(() => {
     const getStoredLang = async () => {
       const lang = await AsyncStorage.getItem('appLanguage');
@@ -124,14 +192,14 @@ useEffect(() => {
   const handleLeave = (id: string) => {
     setGroupChats((prev) => prev.filter((group) => group.id !== id));
   };
-const selectedChats =
-  selectedTab === 'popular'
-    ? groups
-    : selectedTab === 'favorite'
-      ? favoriteGroups
-      : selectedTab === 'active'   // هنا نتحقق إذا التبويب نشط للمجموعات الخاصة بالمستخدم
-        ? userGroups
-        : groupChats;
+  const selectedChats =
+    selectedTab === 'popular'
+      ? groups
+      : selectedTab === 'favorite'
+        ? favoriteGroups
+        : selectedTab === 'active'   // هنا نتحقق إذا التبويب نشط للمجموعات الخاصة بالمستخدم
+          ? userGroups
+          : groupChats;
 
 
   const renderItem = ({ item }: { item: any }) => {
@@ -142,13 +210,13 @@ const selectedChats =
       <TouchableOpacity
         style={[styles.card, darkMode && styles.cardDark, isRTL && styles.rtlRow]}
         onPress={() =>
-          router.push(`/group/${item._id}?name=${encodeURIComponent(item.name)}`)
+          handleJoin(item)
         }
       >
         <View style={[styles.row, isRTL && styles.rtlRow]}>
           <View style={[styles.avatarsRow, isRTL && styles.rtlAvatarsRow]}>
             {displayAvatars.map((member: any, index: number) => {
-              
+
               const key = typeof member === 'object' && member._id ? member._id : `avatar-${index}`;
               return (
                 <Image
@@ -232,7 +300,7 @@ const selectedChats =
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.actionButtonLeave}
-        onPress={() => handleLeave(data.item.id)}
+        onPress={() => handleLeaveGroup(data.item._id)}
       >
         <Text style={styles.actionText}>❌</Text>
       </TouchableOpacity>
@@ -244,10 +312,57 @@ const selectedChats =
     { key: 'favorite', label: 'Favorite', icon: 'star-outline' },
     { key: 'popular', label: 'Popular', icon: 'flame-outline' },
   ];
+  const rotationAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (selectedTab) {
+      rotationAnim.setValue(0); // إعادة التعيين كل مرة
+      Animated.loop(
+        Animated.timing(rotationAnim, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      ).start();
+    }
+  }, [selectedTab]);
+  const rotate = rotationAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // نفّذ هنا عملية إعادة تحميل البيانات مثل جلب المحادثات من الخادم
+      await fetchFavoriteGroups(); // هذه دالة وهمية، استبدلها بدالتك الحقيقية
+
+      await fetchGroups(); // هذه دالة وهمية، استبدلها بدالتك الحقيقية
+      await fetchUserGroups(); // هذه دالة وهمية، استبدلها بدالتك الحقيقية
+
+    } catch (err) {
+      console.error('Failed to refresh chats:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <View style={[styles.container, darkMode && styles.containerDark]}>
       <CustomHeader />
+{loadingGroup && (
+  <View style={styles.loadingOverlay}>
+    <View style={styles.loadingBox}>
+      <ActivityIndicator size="large" color="#007AFF" />
+      <Text style={[styles.loadingText, darkMode && styles.textDark]}>
+        {i18n.t('Loading group...')}
+      </Text>
+    </View>
+  </View>
+)}
+
       <View style={[styles.tabs, isRTL && styles.rtlTabs]}>
         {tabOptions.map((tab) => {
           const isActive = selectedTab === tab.key;
@@ -257,16 +372,18 @@ const selectedChats =
               onPress={() => setSelectedTab(tab.key as any)}
               style={[styles.tabButton, isActive && styles.tabButtonActive]}
             >
-              <Ionicons
-                name={tab.icon as keyof typeof Ionicons.glyphMap}
-                size={20}
-                color={isActive ? '#007aff' : darkMode ? '#ccc' : '#888'}
-              />
+              <Animated.View style={isActive ? { transform: [{ rotate }], marginRight: 4 } : undefined}>
+                <Ionicons
+                  name={tab.icon as keyof typeof Ionicons.glyphMap}
+                  size={20}
+                  color={isActive ? '#fff' : darkMode ? '#ccc' : '#888'}
+                />
+              </Animated.View>
               <Text
                 style={[
                   styles.tabText,
                   {
-                    color: isActive ? '#007aff' : darkMode ? '#ccc' : '#888',
+                    color: isActive ? '#fff' : darkMode ? '#ccc' : '#888',
                     fontWeight: isActive ? 'bold' : 'normal',
                   },
                 ]}
@@ -296,6 +413,9 @@ const selectedChats =
         closeOnScroll={false}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         contentContainerStyle={{ paddingVertical: 8 }}
+
+        refreshing={refreshing}
+        onRefresh={onRefresh}
       />
     </View>
   );
@@ -469,11 +589,43 @@ const styles = StyleSheet.create({
 
   tabIndicator: {
     height: 2,
-    backgroundColor: '#007aff',
-    width: '60%',
+    backgroundColor: '#fff',
+    width: '100%',
     borderRadius: 2,
     position: 'absolute',
     bottom: 0,
+  },
+
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)', // خلفية داكنة شفافة لتعتيم الخلفية
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  loadingBox: {
+    width: 160,
+    paddingVertical: 20,
+    paddingHorizontal: 25,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 12,  // للظل في أندرويد
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#222',
+    textAlign: 'center',
   },
 
 

@@ -1,36 +1,35 @@
 import { useEffect, useState } from 'react';
 import { useWebSocket } from '@/context/WebSocketContext';
 
-interface CreateGroupResponse {
+interface LeaveGroupResponse {
   type: string;
-  group?: any;
+  groupId?: string;
   message?: string;
 }
 
-export function useCreateGroup(userId: string, token: string | null) {
+export function useLeaveGroup(userId: string) {
   const { ws } = useWebSocket();
-  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [group, setGroup] = useState<any>(null);
+  const [leftGroupId, setLeftGroupId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ws.current) return;
 
     const handleMessage = (event: MessageEvent) => {
       try {
-        const data: CreateGroupResponse = JSON.parse(event.data);
+        const data: LeaveGroupResponse = JSON.parse(event.data);
 
-        if (data.type === 'create_group_success' && data.group) {
-          setGroup(data.group);
-          setSuccessMessage('تم إنشاء المجموعة بنجاح');
+        if (data.type === 'leave_group_success' && data.groupId) {
+          setLeftGroupId(data.groupId);
+          setSuccessMessage('تم الخروج من المجموعة بنجاح');
           setLoading(false);
           setError(null);
         }
 
-        if (data.type === 'create_group_failed') {
-          setError(data.message || 'فشل إنشاء المجموعة');
+        if (data.type === 'leave_group_failed') {
+          setError(data.message || 'فشل الخروج من المجموعة');
           setLoading(false);
         }
       } catch (err) {
@@ -45,37 +44,43 @@ export function useCreateGroup(userId: string, token: string | null) {
     };
   }, [ws]);
 
-  const createGroup = (groupName: string) => {
+  const leaveGroup = (groupId: string) => {
+    console.log(groupId);
+    
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
       setError('WebSocket غير متصل');
       return;
     }
 
-    if (!groupName.trim()) {
-      setError('اسم المجموعة لا يمكن أن يكون فارغًا');
+    if (!groupId) {
+      setError('معرف المجموعة غير صالح');
+      return;
+    }
+
+    if (!userId) {
+      setError('معرف المستخدم غير صالح');
       return;
     }
 
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
-    setGroup(null);
+    setLeftGroupId(null);
 
     const message = {
-      type: 'create_group',
-      groupName,
+      type: 'leave_group',
+      groupId,
       userId,
-      token,
     };
 
     ws.current.send(JSON.stringify(message));
   };
 
   return {
-    group,
+    leftGroupId,
     loading,
     error,
     successMessage,
-    createGroup,
+    leaveGroup,
   };
 }

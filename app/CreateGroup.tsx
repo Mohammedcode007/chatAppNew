@@ -9,7 +9,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons'; // You can replace this with any checkbox icon or library
+import { Ionicons } from '@expo/vector-icons';
 import { useCreateGroup } from '@/Hooks/useCreateGroup';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -17,7 +17,7 @@ const CreateGroup = () => {
   const [groupName, setGroupName] = useState('');
   const [showAgreement, setShowAgreement] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
-   const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
@@ -25,16 +25,16 @@ const CreateGroup = () => {
       try {
         const userDataString = await AsyncStorage.getItem('userData');
         if (userDataString) {
-          const userData = JSON.parse(userDataString);
-          setUserData(userData);
+          const parsed = JSON.parse(userDataString);
+          setUserData(parsed);
         }
       } catch (error) {
         console.error('Error fetching user data:', error);
       }
     };
-
     fetchUserData();
   }, []);
+
   useEffect(() => {
     const fetchToken = async () => {
       try {
@@ -43,33 +43,52 @@ const CreateGroup = () => {
           setToken(storedToken);
         }
       } catch (error) {
-        console.error('فشل في جلب التوكن:', error);
+        console.error('Failed to get token:', error);
       }
     };
-
     fetchToken();
   }, []);
-const { createGroup, group, loading, error, successMessage } = useCreateGroup(userData?._id, token);
 
+  const {
+    createGroup,
+    group,
+    loading,
+    error,
+    successMessage
+  } = useCreateGroup(userData?._id, token);
 
   const handleCreateGroup = () => {
     if (!groupName.trim()) {
-      Alert.alert('Missing Group Name', 'Please enter a group name.');
+      Alert.alert('Group name is required', 'Please enter a group name.');
       return;
     }
     if (!isChecked) {
-      Alert.alert('Agreement Required', 'You must accept the agreement to continue.');
+      Alert.alert('Agreement required', 'You must agree to the terms before creating a group.');
       return;
     }
-
-      createGroup(groupName);
-
+    createGroup(groupName);
   };
+
+  useEffect(() => {
+    if (error) {
+      Alert.alert('Error', error);
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (successMessage) {
+      Alert.alert('Success', successMessage);
+      setGroupName('');
+      setIsChecked(false);
+      setShowAgreement(false);
+      // navigation.goBack(); // Optional: if using React Navigation
+    }
+  }, [successMessage]);
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.inner}>
-        <Text style={styles.title}>Create a New Group</Text>
+        <Text style={styles.title}>Create New Group</Text>
 
         <TextInput
           style={styles.input}
@@ -93,24 +112,30 @@ const { createGroup, group, loading, error, successMessage } = useCreateGroup(us
 
         <Pressable onPress={() => setShowAgreement(!showAgreement)}>
           <Text style={styles.agreementText}>
-            View Group Creation Agreement
+            View group creation terms
           </Text>
         </Pressable>
 
         {showAgreement && (
           <View style={styles.inlineAgreement}>
-            <Text style={styles.agreementTitle}>Agreement Terms</Text>
+            <Text style={styles.agreementTitle}>Terms</Text>
             <Text style={styles.agreementBody}>
-              • Your group must not contain any offensive content.{"\n"}
-              • Respect all members within the group.{"\n"}
-              • Inappropriate or illegal content is strictly prohibited.{"\n"}
-              • The platform reserves the right to delete any violating group without prior notice.
+              • Group must not contain offensive content.{"\n"}
+              • Respect all group members.{"\n"}
+              • No inappropriate or illegal content.{"\n"}
+              • Admins reserve the right to delete any violating group without notice.
             </Text>
           </View>
         )}
 
-        <Pressable style={styles.createButton} onPress={handleCreateGroup}>
-          <Text style={styles.createButtonText}>Create Group</Text>
+        <Pressable
+          style={[styles.createButton, loading && { opacity: 0.6 }]}
+          onPress={handleCreateGroup}
+          disabled={loading}
+        >
+          <Text style={styles.createButtonText}>
+            {loading ? 'Creating...' : 'Create Group'}
+          </Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
