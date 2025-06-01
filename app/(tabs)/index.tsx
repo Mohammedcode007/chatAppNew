@@ -102,7 +102,6 @@ export default function ChatsScreen() {
           contentContainerStyle={dynamicStyles.listContainer}
           ItemSeparatorComponent={() => <View style={dynamicStyles.separator} />}
           renderItem={({ item }) => {
-            console.log(item, '44');
 
             const locale = language === 'ar' ? 'ar-EG' : 'en-US';
             const { time, date } = item.lastMessage

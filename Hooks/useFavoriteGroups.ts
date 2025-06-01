@@ -8,7 +8,6 @@ interface FavoriteGroupsResponse {
 }
 
 export function useFavoriteGroups(userId: string) {
-  console.log(userId, '777777777777');
 
   const { ws } = useWebSocket();
   const [groups, setGroups] = useState<any[] | null>(null);
