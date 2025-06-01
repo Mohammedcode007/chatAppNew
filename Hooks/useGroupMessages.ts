@@ -7,8 +7,9 @@ interface Message {
   type: 'text' | 'image' | 'audio';
   text: string;
   sender: string;
-  timestamp: string;  // ISO string
+  timestamp: string;
   groupId?: string;
+  tempId?: string;
 }
 
 interface GroupMessagesResponse {
@@ -17,15 +18,15 @@ interface GroupMessagesResponse {
   messages?: Message[];
   message?: string;
   newMessage?: Message;
-  tempId?: string;  // معرف الرسالة المؤقتة لتحديثها
+  tempId?: string;
 }
 
 interface SendMessagePayload {
   type: string;
   groupId: string;
-  newMessage: string;  // نص الرسالة فقط
+  newMessage: string;
   messageType?: string;
-  tempId?: string; // معرف مؤقت من العميل
+  tempId?: string;
 }
 
 export function useGroupMessages(groupId: string, currentUserId: string) {
@@ -37,11 +38,19 @@ export function useGroupMessages(groupId: string, currentUserId: string) {
   useEffect(() => {
     if (!ws.current || !groupId) return;
 
+    const fetchMessages = () => {
+      if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+        ws.current.send(JSON.stringify({ type: 'fetch_group_messages', groupId }));
+        setLoading(true);
+      }
+    };
+
     const handleMessage = (event: MessageEvent) => {
       try {
         const data: GroupMessagesResponse = JSON.parse(event.data);
+        const messageGroupId = data.groupId || data.newMessage?.groupId;
 
-        if (data.groupId !== groupId) return; // تجاهل رسائل مجموعات أخرى
+        if (messageGroupId !== groupId) return;
 
         switch (data.type) {
           case 'fetch_group_messages_success':
@@ -58,62 +67,56 @@ export function useGroupMessages(groupId: string, currentUserId: string) {
             break;
 
           case 'group_message_sent_confirmation':
-            if (data.newMessage) {
-              setMessages(prev => {
-                // استبدال الرسالة المؤقتة بالرسالة الأصلية أو إضافتها إذا غير موجودة
-                const exists = prev.some(msg => msg._id === data.newMessage!._id);
-                if (exists) {
-                  return prev.map(msg =>
-                    msg._id === data.tempId ? data.newMessage! : msg
-                  );
-                } else {
-                  // حذف الرسالة المؤقتة ثم إضافة الرسالة الرسمية
-                  const filtered = prev.filter(msg => msg._id !== data.tempId);
-                  return [...filtered, data.newMessage!];
-                }
+            if (data.newMessage && data.tempId) {
+              setMessages((prev) => {
+                // إزالة الرسالة المؤقتة التي تم إرسالها
+                const filtered = prev.filter((msg) => msg.tempId !== data.tempId);
+                // دمج الرسالة الجديدة في القائمة
+                const updated = [...filtered, data.newMessage!];
+                // فرز الرسائل حسب الوقت
+                updated.sort(
+                  (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+                );
+                return updated;
               });
             }
             break;
 
-          case 'new_group_message':
-            if (data.newMessage) {
-              setMessages(prev => {
-                // منع التكرار
-                const exists = prev.some(msg => msg._id === data.newMessage!._id);
-                if (exists) return prev;
-                return [...prev, data.newMessage!];
-              });
-            }
-            break;
+       case 'new_group_message':
+  if (data.newMessage) {
+    console.log(data,'888888');
+    
+    setMessages((prev) => {
+      if (prev.find((msg) => msg._id === data.newMessage!._id)) return prev;
+      const updated = [...prev, data.newMessage!];
+      updated.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      return updated;
+    });
+  }
+  break;
 
           default:
             break;
         }
       } catch (err) {
-        console.error('Error parsing WebSocket message:', err);
+        console.error('خطأ في معالجة رسالة WebSocket:', err);
       }
     };
 
     ws.current.addEventListener('message', handleMessage);
 
-    // طلب جلب الرسائل عند الانضمام للمجموعة
-    ws.current.send(JSON.stringify({ type: 'fetch_group_messages', groupId }));
-
-    setLoading(true);
-    setError(null);
+    // جلب الرسائل عند دخول المجموعة لأول مرة
+    fetchMessages();
 
     return () => {
       ws.current?.removeEventListener('message', handleMessage);
     };
   }, [groupId, ws]);
 
-  // دالة إرسال رسالة جديدة للمجموعة
   const sendMessage = (newMessageText: string, messageType: string = 'text') => {
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) return;
 
     const tempId = `temp-${Date.now()}`;
-
-    // إضافة رسالة مؤقتة للواجهة فوراً
     const tempMessage: Message = {
       _id: tempId,
       text: newMessageText,
@@ -122,9 +125,11 @@ export function useGroupMessages(groupId: string, currentUserId: string) {
       timestamp: new Date().toISOString(),
       groupId,
       messageType,
+      tempId,
     };
 
-    setMessages(prev => [...prev, tempMessage]);
+    // عرض الرسالة مؤقتًا فور الإرسال
+    setMessages((prev) => [...prev, tempMessage]);
 
     const payload: SendMessagePayload = {
       type: 'send_group_message',

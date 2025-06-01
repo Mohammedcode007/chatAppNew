@@ -29,7 +29,14 @@ export function useJoinGroup(userId: string) {
         }
 
         if (data.type === 'join_group_failed') {
-          setError(data.message || 'فشل الانضمام إلى المجموعة');
+          // إذا كان المستخدم عضوًا بالفعل، نعتبر العملية ناجحة:
+          if (data.message === 'You are already a member of this group.') {
+            setJoinedGroupId(data.groupId ?? null);
+            setSuccessMessage('أنت بالفعل عضو في هذه المجموعة');
+            setError(null);
+          } else {
+            setError(data.message || 'فشل الانضمام إلى المجموعة');
+          }
           setLoading(false);
         }
       } catch (err) {
@@ -45,7 +52,6 @@ export function useJoinGroup(userId: string) {
   }, [ws]);
 
   const joinGroup = (groupId: string) => {
-    
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
       setError('WebSocket غير متصل');
       return;

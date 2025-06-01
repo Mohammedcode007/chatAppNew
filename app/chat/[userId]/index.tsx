@@ -149,12 +149,7 @@ export default function ChatScreen() {
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
-  // const sendTextMessage = () => {
-  //   if (newMessage.trim().length === 0) return;
-  //   sendMessage({ text: newMessage.trim(), senderId: userData?._id });
-  //   setNewMessage("");
-  //   scrollToEnd();
-  // };
+
 
   const sendTextMessage = () => {
     if (newMessage.trim().length === 0) return;
@@ -185,53 +180,25 @@ export default function ChatScreen() {
   const renderItem = ({ item }: { item: Message }) => {
     const isMyMessage = item.sender === userData?._id;
 
-    // دالة لتشغيل وإيقاف الصوت
-    const toggleSound = async () => {
-      if (!sound) {
-        const { sound: newSound, status } = await Audio.Sound.createAsync(
-          { uri: item.text },
-          { shouldPlay: true }
-        );
-        setSound(newSound);
-        setIsPlaying(true);
-        if (status.isLoaded) {
-          setDurationMillis(status.durationMillis ?? 0);
-          setPositionMillis(status.positionMillis ?? 0);
-        } else {
-          console.error("Failed to load audio:", status);
-        }
+ function formatElapsedTimeEnglish(timestamp: number): string {
+  const now = Date.now();
+  const diff = now - timestamp;
 
-        newSound.setOnPlaybackStatusUpdate((status) => {
-          if ("isPlaying" in status) {
-            setIsPlaying(status.isPlaying);
-            setPositionMillis(status.positionMillis ?? 0);
-            setDurationMillis(status.durationMillis ?? 0);
-            if (!status.isPlaying && status.positionMillis === status.durationMillis) {
-              // نهاية الصوت
-              setIsPlaying(false);
-              setSound(null);
-              setPositionMillis(0);
-            }
-          }
-        });
-      } else {
-        if (isPlaying) {
-          await sound.pauseAsync();
-          setIsPlaying(false);
-        } else {
-          await sound.playAsync();
-          setIsPlaying(true);
-        }
-      }
-    };
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return 'Just now';
 
-    // دالة لتحويل الميلي ثانية إلى صيغة دقيقة:ثانية
-    const formatMillisToTime = (millis: number) => {
-      const totalSeconds = Math.floor(millis / 1000);
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-      return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
-    };
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+
+  // For more than 24 hours, show date formatted like "Jun 1, 2025"
+  const date = new Date(timestamp);
+  const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
+  return date.toLocaleDateString('en-US', options);
+}
+
 
     const renderMessageContent = () => {
       switch (item.messageType) {
@@ -342,7 +309,7 @@ export default function ChatScreen() {
                 { color: isMyMessage ? "#d1eaff" : darkMode ? "#aaa" : "#666" },
               ]}
             >
-              {formatTime(item.timestamp)}
+  {formatElapsedTimeEnglish(new Date(item.timestamp).getTime())}
             </Text>
             {reactions[item._id] && reactions[item._id].length > 0 && (
               <View style={{ flexDirection: "row", marginTop: 4 }}>
@@ -361,7 +328,7 @@ export default function ChatScreen() {
     );
   };
 
- const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener("keyboardDidShow", () => setKeyboardVisible(true));
@@ -513,44 +480,44 @@ export default function ChatScreen() {
   };
 
   return (
-   <KeyboardAvoidingView
-  style={{ flex: 1 }}
-  behavior={Platform.OS === "ios" ? "padding" : "height"}
-  keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0} // يمكن تعديل الرقم حسب الـ header
->
-  <SafeAreaView style={{ flex: 1, backgroundColor: darkMode ? "#000" : "#fff" }}>
-    <ChatHeader
-      chatName={name?.toString() ?? "اسم افتراضي"}
-      userStatus={status?.toString() ?? " حاله افتراضيه"}
-      onBackPress={onBackPress}
-      userId={userId}
-    />
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0} // يمكن تعديل الرقم حسب الـ header
+    >
+      <SafeAreaView style={{ flex: 1, backgroundColor: darkMode ? "#000" : "#fff" }}>
+        <ChatHeader
+          chatName={name?.toString() ?? "اسم افتراضي"}
+          userStatus={status?.toString() ?? " حاله افتراضيه"}
+          onBackPress={onBackPress}
+          userId={userId}
+        />
 
-    <FlatList
-      ref={flatListRef}
-      data={messages}
-      extraData={messages}
-      keyExtractor={(item) => item._id}
-      renderItem={renderItem}
-      contentContainerStyle={styles.flatListContent}
-      onContentSizeChange={scrollToEnd}
-      onLayout={scrollToEnd}
-      keyboardShouldPersistTaps="handled"
-    />
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          extraData={messages}
+          keyExtractor={(item) => item._id}
+          renderItem={renderItem}
+          contentContainerStyle={styles.flatListContent}
+          onContentSizeChange={scrollToEnd}
+          onLayout={scrollToEnd}
+          keyboardShouldPersistTaps="handled"
+        />
 
-    <ChatInput
-      darkMode={darkMode}
-      newMessage={newMessage}
-      setNewMessage={setNewMessage}
-      pickAndUploadImage={pickAndUploadImage}
-      isRecording={isRecording}
-      startRecording={startRecording}
-      stopRecording={stopRecording}
-      sendTextMessage={sendTextMessage}
-      insetsBottom={0}
-    />
-  </SafeAreaView>
-</KeyboardAvoidingView>
+        <ChatInput
+          darkMode={darkMode}
+          newMessage={newMessage}
+          setNewMessage={setNewMessage}
+          pickAndUploadImage={pickAndUploadImage}
+          isRecording={isRecording}
+          startRecording={startRecording}
+          stopRecording={stopRecording}
+          sendTextMessage={sendTextMessage}
+          insetsBottom={0}
+        />
+      </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 

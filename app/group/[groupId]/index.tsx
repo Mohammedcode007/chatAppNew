@@ -18,14 +18,19 @@ import { useNavigation } from 'expo-router';
 import GroupHeader from '@/components/GroupHeader';
 import { useGroupMessages } from '@/Hooks/useGroupMessages';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import MessageInput from '@/components/MessageInput';
+import GroupMessageItem from '@/components/GroupMessageItem';
 
 type Message = {
-  _id: string; // المعرف الحقيقي أو معرف وهمي يبدأ بـ "temp-"
+  _id: string; // معرف حقيقي أو وهمي يبدأ بـ "temp-"
   type: 'text' | 'image' | 'audio';
   text: string;
-  sender: string;
+  sender: {
+    _id: string;
+    username: string;
+  }
   timestamp: number;
-  isTemporary?: boolean; // رسالة مؤقتة
+  isTemporary?: boolean;
 };
 
 const formatTime = (timestamp: number): string => {
@@ -43,21 +48,22 @@ export default function GroupChatScreen() {
   const { groupId, name } = useLocalSearchParams<{ groupId: string; name?: string }>();
   const { darkMode } = useThemeMode();
   const [userData, setUserData] = useState<any>(null);
-
   const { messages, loading, error, sendMessage } = useGroupMessages(groupId, userData?._id || '');
   const [inputText, setInputText] = useState('');
   const flatListRef = useRef<FlatList>(null);
+
   const navigation = useNavigation();
 
-  // الحالة التي تحتوي الرسائل المعروضة (بما في ذلك الرسائل الوهمية)
+  // حالة الرسائل المحلية تشمل الرسائل الوهمية والحقيقية
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
+  console.log(localMessages, '78878787');
 
   useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
   }, []);
 
   useEffect(() => {
-    const fetchUserData = async () => {
+    (async () => {
       try {
         const userDataString = await AsyncStorage.getItem('userData');
         if (userDataString) {
@@ -66,14 +72,14 @@ export default function GroupChatScreen() {
       } catch (error) {
         console.error('Error fetching user data:', error);
       }
-    };
-    fetchUserData();
+    })();
   }, []);
 
-  // كل مرة تصل رسائل من الخادم (useGroupMessages)، ندمجها مع localMessages
+  // تحديث localMessages عند استقبال رسائل جديدة من الخادم
   useEffect(() => {
-    // الرسائل التي ليست وهمية مع المعرف الحقيقي فقط
-    const realMessages = messages.map((msg: any) => ({
+    if (!messages) return;
+
+    const realMessages: Message[] = messages.map((msg: any) => ({
       _id: msg._id,
       type: msg.messageType,
       text: msg.text,
@@ -82,26 +88,23 @@ export default function GroupChatScreen() {
       isTemporary: false,
     }));
 
-    setLocalMessages((prev) => {
-      // استبعاد الرسائل الوهمية التي تم استبدالها برسائل حقيقية
-      const realIds = realMessages.map(m => m._id);
-      const filteredPrev = prev.filter(m =>
-        m.isTemporary && !realIds.includes(m._id.replace('temp-', ''))
-      );
+    setLocalMessages(prev => {
+      // حذف الرسائل الوهمية التي تم استبدالها
+      const realIds = new Set(realMessages.map(m => m._id));
+      const filteredPrev = prev.filter(m => m.isTemporary && !realIds.has(m._id.replace('temp-', '')));
 
-      // دمج الرسائل الحقيقية مع الوهمية المتبقية
       const combined = [...filteredPrev, ...realMessages];
-
-      // فرز حسب التوقيت
       combined.sort((a, b) => a.timestamp - b.timestamp);
-
       return combined;
     });
+
+    // تمرير إلى آخر الرسائل
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
   }, [messages]);
 
-  // إرسال رسالة نصية
+  // إرسال رسالة نصية مع عرض الرسالة الوهمية فوراً
   const sendTextMessage = async () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || !userData?._id) return;
 
     const tempId = `temp-${Date.now()}`;
 
@@ -109,90 +112,50 @@ export default function GroupChatScreen() {
       _id: tempId,
       type: 'text',
       text: inputText.trim(),
-      sender: userData?._id || 'unknown',
+      sender: userData._id,
       timestamp: Date.now(),
       isTemporary: true,
     };
 
     // عرض الرسالة الوهمية فوراً
-    // setLocalMessages(prev => [...prev, newTempMessage]);
+    setLocalMessages(prev => [...prev, newTempMessage]);
     setInputText('');
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
     try {
-      // انتظار تأكيد الإرسال (تأكد أن sendMessage يعيد Promise<رسالة>)
       await sendMessage(inputText.trim(), 'text');
-      // لن تحتاج لتعديل هنا لأن useEffect سيراقب messages ويحدث localMessages
+      // الرسائل الحقيقية ستصل وتحدث localMessages من useEffect أعلاه
     } catch (error) {
       // حذف الرسالة الوهمية عند فشل الإرسال
       setLocalMessages(prev => prev.filter(m => m._id !== tempId));
       console.error('Failed to send message:', error);
-      // يمكنك عرض رسالة خطأ للمستخدم حسب الحاجة
+      // هنا يمكن إضافة إعلام المستخدم بالفشل
     }
-
-    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 150);
   };
 
-  // عرض الرسالة
+  // عرض الرسائل مع التفريق بين رسائل المستخدم والآخرين
   const renderMessage = ({ item }: { item: Message }) => {
-    const isMyMessage = item.sender === userData?._id;
+    const isMyMessage = item.sender._id === userData?._id;
 
     return (
-      <View style={{ marginBottom: 8, opacity: item.isTemporary ? 0.6 : 1 }}>
-        <Text
-          style={{
-            fontSize: 13,
-            color: darkMode ? '#aaa' : '#666',
-            alignSelf: isMyMessage ? 'flex-end' : 'flex-start',
-            marginBottom: 2,
-          }}
-        >
-          {isMyMessage ? 'أنت' : item.sender}
-        </Text>
+       <GroupMessageItem item={item} currentUserId={userData?._id} />
 
-        <View
-          style={[
-            styles.messageContainer,
-            isMyMessage ? styles.myMessage : styles.otherMessage,
-            darkMode && { backgroundColor: isMyMessage ? '#0a84ff' : '#444' },
-          ]}
-        >
-          {item.type === 'text' && (
-            <Text style={[styles.messageText, darkMode && { color: '#fff' }]}>
-              {item.text}
-            </Text>
-          )}
-
-          {item.type === 'image' && (
-            <Image source={{ uri: item.text }} style={styles.imageMessage} resizeMode="cover" />
-          )}
-
-          {item.type === 'audio' && (
-            <AudioMessagePlayer uri={item.text} isMyMessage={isMyMessage} />
-          )}
-
-          <Text
-            style={{
-              fontSize: 11,
-              color: darkMode ? '#aaa' : '#999',
-              alignSelf: isMyMessage ? 'flex-end' : 'flex-start',
-              marginTop: 2,
-              marginHorizontal: 4,
-            }}
-          >
-            {formatTime(item.timestamp)}
-          </Text>
-        </View>
-      </View>
     );
   };
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, darkMode && { backgroundColor: '#000' }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}
+   <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0} // يمكن تعديل الرقم حسب الـ header
     >
-      <GroupHeader title={name || 'المجموعة'} membersCount={12} settingId="45" />
+      <GroupHeader
+        title={name || 'المجموعة'}
+        membersCount={12}
+        settingId="45"
+        userId={userData?._id}
+        groupId={groupId}
+      />
 
       <FlatList
         ref={flatListRef}
@@ -204,28 +167,12 @@ export default function GroupChatScreen() {
         onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
       />
 
-      <View style={[styles.inputContainer, darkMode && { backgroundColor: '#222' }]}>
-        <TextInput
-          style={[styles.textInput, darkMode && { color: '#fff' }]}
-          value={inputText}
-          onChangeText={setInputText}
-          placeholder="اكتب رسالة..."
-          placeholderTextColor={darkMode ? '#aaa' : '#888'}
-          multiline
-        />
-
-        <TouchableOpacity
-          onPress={sendTextMessage}
-          style={[styles.iconButton, { marginLeft: 8 }]}
-          disabled={!inputText.trim()}
-        >
-          <Ionicons
-            name="send"
-            size={28}
-            color={inputText.trim() ? (darkMode ? '#0af' : '#007aff') : '#ccc'}
-          />
-        </TouchableOpacity>
-      </View>
+      <MessageInput
+        inputText={inputText}
+        onChangeText={setInputText}
+        onSend={sendTextMessage}
+        darkMode={darkMode}
+      />
     </KeyboardAvoidingView>
   );
 }

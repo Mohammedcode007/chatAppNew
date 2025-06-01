@@ -4,25 +4,38 @@ import { Text } from '@/components/Themed';
 import { Ionicons, Entypo, Feather, MaterialIcons, AntDesign } from '@expo/vector-icons';
 import { useThemeMode } from '@/context/ThemeContext';
 import { useNavigation, useRouter } from 'expo-router';
+import { useLeaveGroup } from '@/Hooks/useLeaveGroup';
 
 type Props = {
   title: string;
   membersCount?: number;
   settingId: string;
+  userId: string;
+  groupId: string;
 
 };
 
-export default function GroupHeader({ title, membersCount, settingId }: Props) {
+export default function GroupHeader({ title, membersCount, settingId,userId,groupId }: Props) {
   const { darkMode } = useThemeMode();
   const navigation = useNavigation();
   const [menuVisible, setMenuVisible] = useState(false);
   const router = useRouter();
+  const {
+    leaveGroup,
+    loading,
+    error,
+    successMessage,
+    leftGroupId,
+  } = useLeaveGroup(userId);
 
+  const handleLeave = () => {
+    leaveGroup(groupId);
+  };
   const handleOptionPress = (option: string) => {
     setMenuVisible(false);
     switch (option) {
       case 'leave':
-        // تنفيذ مغادرة المجموعة
+        handleLeave()
         break;
       case 'settings':
         router.push(`/group/settings/${settingId}`);

@@ -106,47 +106,40 @@ const [loadingGroup, setLoadingGroup] = useState(false);
 // تعديل الدالة handleJoin لتفعيل اللودنج عند الضغط:
 const handleJoin = (item: any) => {
   if (item && item._id) {
-    setLoadingGroup(true);   // بدء التحميل
+    setLoadingGroup(true);
     setGroupNameForUrl(item.name);
     setSelectedGroup(item);
   } else {
-    console.error('معرف المجموعة غير موجود في العنصر');
+    console.error('معرف المجموعة غير موجود');
   }
 };
 
+
 // تعديل useEffect المسؤول عن التوجيه والاشتراك ليوقف اللودنج عند الانتهاء:
 useEffect(() => {
-  if (!selectedGroup || !members || !userData) {
-    setLoadingGroup(false);  // توقف اللودنج لو البيانات ناقصة
-    return;
-  }
+  if (!selectedGroup || !members || !userData) return;
 
-  const isAlreadyMember = members.some((member: { _id: any }) => member._id === userData._id);
+  const isMember = members.some(
+    (member: { _id: string }) => member._id === userData._id
+  );
 
-  if (isAlreadyMember) {
-    if (selectedGroup._id && groupNameForUrl) {
-      router.push(`/group/${selectedGroup._id}?name=${encodeURIComponent(groupNameForUrl)}`);
-      setLoadingGroup(false);  // انتهى التحميل وحدث التوجيه
-    } else {
-      console.warn('بيانات المجموعة أو الاسم غير موجودة');
-      setLoadingGroup(false);
-    }
+  if (isMember) {
+    // المستخدم عضو فعلاً
+    router.push(`/group/${selectedGroup._id}?name=${encodeURIComponent(groupNameForUrl)}`);
+    setLoadingGroup(false);
   } else {
+    // المستخدم ليس عضوًا، قم بالانضمام
     setShouldJoin(true);
-    if (selectedGroup._id) {
-      joinGroup(selectedGroup._id);
-    } else {
-      console.error('selectedGroup._id غير موجود');
-      setLoadingGroup(false);
-    }
+    joinGroup(selectedGroup._id);
   }
-}, [members, selectedGroup, groupNameForUrl, userData]);
+}, [members, selectedGroup, userData]);
 
 // توقف اللودنج عند نجاح الانضمام أيضاً:
 useEffect(() => {
   if (shouldJoin && successMessage && joinedGroupId) {
     router.push(`/group/${joinedGroupId}?name=${encodeURIComponent(groupNameForUrl)}`);
-    setLoadingGroup(false);
+    setShouldJoin(false); // إعادة التهيئة
+    setLoadingGroup(false); // إيقاف اللودنج
   }
 }, [successMessage, joinedGroupId, groupNameForUrl, shouldJoin]);
 
