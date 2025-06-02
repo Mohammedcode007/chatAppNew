@@ -83,7 +83,7 @@ export default function GroupChatScreen() {
       _id: msg._id,
       type: msg.messageType,
       text: msg.text,
-      sender: msg.sender,
+      sender: msg?.sender,
       timestamp: new Date(msg.timestamp).getTime(),
       isTemporary: false,
     }));
@@ -118,16 +118,18 @@ export default function GroupChatScreen() {
     };
 
     // عرض الرسالة الوهمية فوراً
-    setLocalMessages(prev => [...prev, newTempMessage]);
+    // setLocalMessages(prev => [...prev, newTempMessage]);
     setInputText('');
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
     try {
       await sendMessage(inputText.trim(), 'text');
+            setLocalMessages(prev => prev.filter(m => m._id !== tempId));
+
       // الرسائل الحقيقية ستصل وتحدث localMessages من useEffect أعلاه
     } catch (error) {
       // حذف الرسالة الوهمية عند فشل الإرسال
-      setLocalMessages(prev => prev.filter(m => m._id !== tempId));
+      // setLocalMessages(prev => prev.filter(m => m._id !== tempId));
       console.error('Failed to send message:', error);
       // هنا يمكن إضافة إعلام المستخدم بالفشل
     }
@@ -135,7 +137,7 @@ export default function GroupChatScreen() {
 
   // عرض الرسائل مع التفريق بين رسائل المستخدم والآخرين
   const renderMessage = ({ item }: { item: Message }) => {
-    const isMyMessage = item.sender._id === userData?._id;
+    const isMyMessage = item.sender?._id === userData?._id;
 
     return (
        <GroupMessageItem item={item} currentUserId={userData?._id} />

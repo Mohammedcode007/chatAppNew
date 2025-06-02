@@ -30,23 +30,14 @@ interface Props {
   currentUserId: string;
 }
 
-const formatTime = (timestamp: number): string => {
-  const date = new Date(timestamp);
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  const isAM = hours < 12;
-  const formattedHours = (hours % 12 || 12).toString().padStart(2, '0');
-  const formattedMinutes = minutes.toString().padStart(2, '0');
-  const period = isAM ? 'ص' : 'م';
-  return `${formattedHours}:${formattedMinutes} ${period}`;
-};
+
 
 const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 
 const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
   const { darkMode } = useThemeMode();
-  const isMyMessage = item.sender._id === currentUserId;
-  const avatar = item.sender.avatar || DEFAULT_AVATAR;
+  const isMyMessage = item?.sender?._id === currentUserId;
+  const avatar = item?.sender?.avatar || DEFAULT_AVATAR;
 
   // ألوان الوضع الليلي / الفاتح
   const colors = {
@@ -59,6 +50,8 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
     tailColorMy: darkMode ? '#3B7D64' : '#A8D5BA',
     tailColorOther: darkMode ? '#2E2E2E' : '#F0F0F0',
     avatarBorder: darkMode ? '#4CAF50' : '#6BAF91',
+    usernameUnderline: darkMode ? '#555' : '#ccc',
+
   };
 
   return (
@@ -68,13 +61,14 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
         { flexDirection: isMyMessage ? 'row-reverse' : 'row' },
       ]}
     >
-      {!isMyMessage && (
-        <Image
-          source={{ uri: avatar }}
-          style={[styles.avatar, { borderColor: colors.avatarBorder }]}
-          resizeMode="cover"
-        />
-      )}
+  {!isMyMessage && item?.sender && (
+  <Image
+    source={{ uri: avatar }}
+    style={[styles.avatar, { borderColor: colors.avatarBorder }]}
+    resizeMode="cover"
+  />
+)}
+
 
       <View style={styles.messageWrapper}>
         {/* ذيل الرسالة */}
@@ -107,9 +101,24 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
         >
           {/* اسم المرسل يظهر فقط للرسائل الغير خاصة بي */}
           {!isMyMessage && (
-            <Text style={[styles.username, { color: colors.usernameText }]}>
-              {item.sender?.username || 'مستخدم'}
-            </Text>
+            <View style={{
+              backgroundColor: darkMode ? '#444' : '#ddd',
+              paddingHorizontal: 6,
+              paddingVertical: 2,
+              borderRadius: 8,
+              alignSelf: 'flex-start',
+              marginBottom: 4
+            }}>
+              {
+                item.sender ? ( <Text style={{ color: colors.usernameText, fontSize: 12 }}>
+                {item.sender?.username || 'مستخدم'}
+              </Text>): (
+               ""
+              )
+              }
+             
+            </View>
+
           )}
 
           {/* رسالة نصية */}
@@ -142,34 +151,9 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
             <AudioMessagePlayer uri={item.text} isMyMessage={isMyMessage} />
           )}
 
-          {/* مؤشر تحميل إذا الرسالة مؤقتة */}
-          {item.isTemporary && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={colors.myMessageText} />
-              <Text
-                style={[
-                  styles.sendingText,
-                  { color: colors.myMessageText },
-                ]}
-              >
-                جاري الإرسال...
-              </Text>
-            </View>
-          )}
 
-          {/* توقيت الرسالة */}
-          <View style={styles.timeContainer}>
-            <Text style={[styles.timestamp, { color: colors.timestampText }]}>
-              {formatTime(item.timestamp)}
-            </Text>
-            {/* أيقونة ساعة صغيرة */}
-            <Image
-              source={{
-                uri: 'https://cdn-icons-png.flaticon.com/512/2921/2921222.png',
-              }}
-              style={styles.clockIcon}
-            />
-          </View>
+
+
         </View>
       </View>
     </View>
@@ -180,7 +164,7 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'flex-end',
     marginBottom: 12,
-    paddingHorizontal: 10,
+    paddingHorizontal: 0,
   },
   messageWrapper: {
     maxWidth: '80%',
