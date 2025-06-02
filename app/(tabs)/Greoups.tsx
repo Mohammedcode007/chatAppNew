@@ -56,6 +56,7 @@ export default function GroupChatsScreen() {
   const router = useRouter();
   const [selectedTab, setSelectedTab] = useState<'favorite' | 'active' | 'popular'>('active');
   const [userData, setUserData] = useState<any>(null);
+  const hasEnteredRoom = useRef(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -101,49 +102,59 @@ export default function GroupChatsScreen() {
   const { members, loading: loadingMembers, error: membersError } = useGroupMembers(selectedGroup?._id || null);
 
 
-const [loadingGroup, setLoadingGroup] = useState(false);
+  const [loadingGroup, setLoadingGroup] = useState(false);
 
-// تعديل الدالة handleJoin لتفعيل اللودنج عند الضغط:
-const handleJoin = (item: any) => {
-  if (item && item._id) {
-    setLoadingGroup(true);
-    setGroupNameForUrl(item.name);
-    setSelectedGroup(item);
-  } else {
-    console.error('معرف المجموعة غير موجود');
-  }
-};
+  const handleJoin = (item: any) => {
+    if (item && item._id) {
+      setLoadingGroup(true);
+      setGroupNameForUrl(item.name);
+      setSelectedGroup(item);
+      hasEnteredRoom.current = false; // إعادة تعيين حالة الدخول
+    } else {
+      console.error('معرف المجموعة غير موجود');
+    }
+  };
 
+  // تحقق ودخول الغرفة عند تحديث الأعضاء
+  const [isMember, setIsMember] = useState(false);
 
-// تعديل useEffect المسؤول عن التوجيه والاشتراك ليوقف اللودنج عند الانتهاء:
-useEffect(() => {
-  if (!selectedGroup || !members || !userData) return;
+  useEffect(() => {
+    if (!selectedGroup || !members || !userData) return;
 
-  const isMember = members.some(
-    (member: { _id: string }) => member._id === userData._id
-  );
+    const memberCheck = members.some(
+      (member) => String(member._id).trim() === String(userData._id).trim()
+    );
 
-  if (isMember) {
-    // المستخدم عضو فعلاً
-    router.push(`/group/${selectedGroup._id}?name=${encodeURIComponent(groupNameForUrl)}`);
-    setLoadingGroup(false);
-  } else {
-    // المستخدم ليس عضوًا، قم بالانضمام
-    setShouldJoin(true);
-    joinGroup(selectedGroup._id);
-  }
-}, [members, selectedGroup, userData]);
-
-// توقف اللودنج عند نجاح الانضمام أيضاً:
-useEffect(() => {
-  if (shouldJoin && successMessage && joinedGroupId) {
-    router.push(`/group/${joinedGroupId}?name=${encodeURIComponent(groupNameForUrl)}`);
-    setShouldJoin(false); // إعادة التهيئة
-    setLoadingGroup(false); // إيقاف اللودنج
-  }
-}, [successMessage, joinedGroupId, groupNameForUrl, shouldJoin]);
+    if (memberCheck) {
+      setIsMember(true);
+      if (!hasEnteredRoom.current) {
+        router.push(`/group/${selectedGroup._id}?name=${encodeURIComponent(groupNameForUrl)}`);
+        hasEnteredRoom.current = true;
+        setLoadingGroup(false);
+      }
+    } else {
+      setIsMember(false);
+      // نفذ طلب الانضمام فقط ولا توجه أو تجلب رسائل
+      joinGroup(selectedGroup._id);
+    }
+  }, [members, selectedGroup, userData]);
 
 
+
+  // تابع نجاح الانضمام - عند نجاح الانضمام، يصبح isMember true تلقائياً بسبب تحديث أعضاء المجموعة (members)
+  useEffect(() => {
+    if (shouldJoin && successMessage && joinedGroupId && !hasEnteredRoom.current) {
+      setIsMember(true);
+      router.push(`/group/${joinedGroupId}?name=${encodeURIComponent(groupNameForUrl)}`);
+      setShouldJoin(false);
+      setLoadingGroup(false);
+      hasEnteredRoom.current = true;
+    }
+  }, [successMessage, joinedGroupId, shouldJoin]);
+
+
+
+  // خروج من المجموعة
   const handleLeaveGroup = (groupid: string) => {
     requestLeaveGroup(groupid);
   };
@@ -182,9 +193,6 @@ useEffect(() => {
     // منطق كتم المحادثة
   };
 
-  const handleLeave = (id: string) => {
-    setGroupChats((prev) => prev.filter((group) => group.id !== id));
-  };
   const selectedChats =
     selectedTab === 'popular'
       ? groups
@@ -345,16 +353,16 @@ useEffect(() => {
   return (
     <View style={[styles.container, darkMode && styles.containerDark]}>
       <CustomHeader />
-{loadingGroup && (
-  <View style={styles.loadingOverlay}>
-    <View style={styles.loadingBox}>
-      <ActivityIndicator size="large" color="#007AFF" />
-      <Text style={[styles.loadingText, darkMode && styles.textDark]}>
-        {i18n.t('Loading group...')}
-      </Text>
-    </View>
-  </View>
-)}
+      {loadingGroup && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#007AFF" />
+            <Text style={[styles.loadingText, darkMode && styles.textDark]}>
+              {i18n.t('Loading group...')}
+            </Text>
+          </View>
+        </View>
+      )}
 
       <View style={[styles.tabs, isRTL && styles.rtlTabs]}>
         {tabOptions.map((tab) => {

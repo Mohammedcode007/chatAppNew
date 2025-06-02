@@ -31,6 +31,8 @@ type Message = {
   }
   timestamp: number;
   isTemporary?: boolean;
+  senderType?: 'user' | 'system'; // ← أضف هذا الحقل هنا
+
 };
 
 const formatTime = (timestamp: number): string => {
@@ -48,6 +50,8 @@ export default function GroupChatScreen() {
   const { groupId, name } = useLocalSearchParams<{ groupId: string; name?: string }>();
   const { darkMode } = useThemeMode();
   const [userData, setUserData] = useState<any>(null);
+  const [senderType, setSenderType] = useState<'user' | 'system'>('user');
+
   const { messages, loading, error, sendMessage } = useGroupMessages(groupId, userData?._id || '');
   const [inputText, setInputText] = useState('');
   const flatListRef = useRef<FlatList>(null);
@@ -86,6 +90,8 @@ export default function GroupChatScreen() {
       sender: msg?.sender,
       timestamp: new Date(msg.timestamp).getTime(),
       isTemporary: false,
+      senderType: msg.senderType, // ← أضف هذا السطر
+
     }));
 
     setLocalMessages(prev => {
@@ -123,8 +129,8 @@ export default function GroupChatScreen() {
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
     try {
-      await sendMessage(inputText.trim(), 'text');
-            setLocalMessages(prev => prev.filter(m => m._id !== tempId));
+      await sendMessage(inputText.trim(), 'text', senderType);
+      setLocalMessages(prev => prev.filter(m => m._id !== tempId));
 
       // الرسائل الحقيقية ستصل وتحدث localMessages من useEffect أعلاه
     } catch (error) {
@@ -140,13 +146,13 @@ export default function GroupChatScreen() {
     const isMyMessage = item.sender?._id === userData?._id;
 
     return (
-       <GroupMessageItem item={item} currentUserId={userData?._id} />
+      <GroupMessageItem item={item} currentUserId={userData?._id} />
 
     );
   };
 
   return (
-   <KeyboardAvoidingView
+    <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0} // يمكن تعديل الرقم حسب الـ header

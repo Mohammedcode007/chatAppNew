@@ -9,8 +9,6 @@ import {
 import { Text } from '@/components/Themed';
 import { useThemeMode } from '@/context/ThemeContext';
 import AudioMessagePlayer from '@/components/AudioMessagePlayer';
-// إذا تستخدم مكتبة LinearGradient
-// import LinearGradient from 'react-native-linear-gradient';
 
 export type Message = {
   _id: string;
@@ -23,6 +21,7 @@ export type Message = {
   };
   timestamp: number;
   isTemporary?: boolean;
+  senderType?: 'system' | 'user'; // ✅ تمت إضافتها
 };
 
 interface Props {
@@ -30,16 +29,14 @@ interface Props {
   currentUserId: string;
 }
 
-
-
 const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 
 const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
   const { darkMode } = useThemeMode();
   const isMyMessage = item?.sender?._id === currentUserId;
   const avatar = item?.sender?.avatar || DEFAULT_AVATAR;
+  const isSystemMessage = item.senderType === 'system';
 
-  // ألوان الوضع الليلي / الفاتح
   const colors = {
     myMessageBg: darkMode ? '#3B7D64' : '#A8D5BA',
     otherMessageBg: darkMode ? '#2E2E2E' : '#F0F0F0',
@@ -50,9 +47,11 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
     tailColorMy: darkMode ? '#3B7D64' : '#A8D5BA',
     tailColorOther: darkMode ? '#2E2E2E' : '#F0F0F0',
     avatarBorder: darkMode ? '#4CAF50' : '#6BAF91',
-    usernameUnderline: darkMode ? '#555' : '#ccc',
-
   };
+
+
+
+console.log(isSystemMessage);
 
   return (
     <View
@@ -61,16 +60,16 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
         { flexDirection: isMyMessage ? 'row-reverse' : 'row' },
       ]}
     >
-  {!isMyMessage && item?.sender && (
-  <Image
-    source={{ uri: avatar }}
-    style={[styles.avatar, { borderColor: colors.avatarBorder }]}
-    resizeMode="cover"
-  />
-)}
-
-
-      <View style={styles.messageWrapper}>
+      {!isMyMessage && !isSystemMessage && (
+        <Image
+          source={{ uri: avatar }}
+          style={[styles.avatar, { borderColor: colors.avatarBorder }]}
+          resizeMode="cover"
+        />
+      )}
+      {isSystemMessage ? (<View style={{ alignItems: 'center', marginVertical: 6 ,flex:1,justifyContent:"center"}}>
+        <Text style={{ color: 'red', fontSize: 14 }}>{item.text}</Text>
+      </View>) : (<View style={styles.messageWrapper}>
         {/* ذيل الرسالة */}
         <View
           style={[
@@ -100,25 +99,21 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
           ]}
         >
           {/* اسم المرسل يظهر فقط للرسائل الغير خاصة بي */}
-          {!isMyMessage && (
-            <View style={{
-              backgroundColor: darkMode ? '#444' : '#ddd',
-              paddingHorizontal: 6,
-              paddingVertical: 2,
-              borderRadius: 8,
-              alignSelf: 'flex-start',
-              marginBottom: 4
-            }}>
-              {
-                item.sender ? ( <Text style={{ color: colors.usernameText, fontSize: 12 }}>
+          {!isMyMessage && item.sender && (
+            <View
+              style={{
+                backgroundColor: darkMode ? '#444' : '#ddd',
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderRadius: 8,
+                alignSelf: 'flex-start',
+                marginBottom: 4,
+              }}
+            >
+              <Text style={{ color: colors.usernameText, fontSize: 12 }}>
                 {item.sender?.username || 'مستخدم'}
-              </Text>): (
-               ""
-              )
-              }
-             
+              </Text>
             </View>
-
           )}
 
           {/* رسالة نصية */}
@@ -150,12 +145,9 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
           {item.type === 'audio' && (
             <AudioMessagePlayer uri={item.text} isMyMessage={isMyMessage} />
           )}
-
-
-
-
         </View>
-      </View>
+      </View>)}
+
     </View>
   );
 };
@@ -202,11 +194,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
     borderWidth: 2,
   },
-  username: {
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 5,
-  },
   messageText: {
     fontSize: 16,
     lineHeight: 24,
@@ -218,31 +205,25 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginTop: 8,
   },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
+  // ✅ أنماط رسائل النظام
+  systemMessageContainer: {
+    alignSelf: 'center',
+    backgroundColor: '#FFE082',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginVertical: 8,
+    maxWidth: '85%',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  sendingText: {
-    marginLeft: 8,
-    fontSize: 13,
-    fontStyle: 'italic',
-  },
-  timeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    justifyContent: 'flex-end',
-  },
-  timestamp: {
-    fontSize: 11,
-    marginRight: 4,
-  },
-  clockIcon: {
-    width: 12,
-    height: 12,
-    tintColor: '#888',
-    marginTop: Platform.OS === 'ios' ? 1 : 0,
+  systemMessageText: {
+    color: '#333',
+    fontSize: 14,
+    textAlign: 'center',
+    fontWeight: '600',
   },
 });
 

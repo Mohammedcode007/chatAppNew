@@ -30,7 +30,7 @@ const groupMessageSchema = new mongoose.Schema({
     type: String,
     enum: ['user', 'system'],
     default: 'user',
-    required: false
+    required: true
   },
   text: {
     type: String,
