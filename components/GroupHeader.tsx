@@ -15,7 +15,7 @@ type Props = {
 
 };
 
-export default function GroupHeader({ title, membersCount, settingId,userId,groupId }: Props) {
+export default function GroupHeader({ title, membersCount, settingId, userId, groupId }: Props) {
   const { darkMode } = useThemeMode();
   const navigation = useNavigation();
   const [menuVisible, setMenuVisible] = useState(false);
@@ -28,8 +28,17 @@ export default function GroupHeader({ title, membersCount, settingId,userId,grou
     leftGroupId,
   } = useLeaveGroup(userId);
 
-  const handleLeave = () => {
-    leaveGroup(groupId);
+  const handleLeave = async() => {
+
+     const success = await leaveGroup(groupId)
+
+    if (success) {
+      console.log('تم الخروج بنجاح');
+     
+
+    } else {
+      console.log('فشل الخروج من المجموعة');
+    }
   };
   const handleOptionPress = (option: string) => {
     setMenuVisible(false);
@@ -38,7 +47,7 @@ export default function GroupHeader({ title, membersCount, settingId,userId,grou
         handleLeave()
         break;
       case 'settings':
-        router.push(`/group/settings/${settingId}`);
+  router.push(`/group/settings/${settingId}?userId=${encodeURIComponent(userId)}&groupId=${encodeURIComponent(groupId)}`);
 
         // فتح صفحة الإعدادات
         break;
@@ -55,7 +64,7 @@ export default function GroupHeader({ title, membersCount, settingId,userId,grou
   };
 
   const menuOptions = [
-    { label: 'Leave Group', value: 'leave', icon: <MaterialIcons name="exit-to-app" size={18} color={darkMode ? '#fff' : '#000'} /> },
+    // { label: 'Leave Group', value: 'leave', icon: <MaterialIcons name="exit-to-app" size={18} color={darkMode ? '#fff' : '#000'} /> },
     { label: 'Settings', value: 'settings', icon: <Feather name="settings" size={18} color={darkMode ? '#fff' : '#000'} /> },
     { label: 'Invite', value: 'invite', icon: <Feather name="user-plus" size={18} color={darkMode ? '#fff' : '#000'} /> },
     { label: 'Report', value: 'report', icon: <MaterialIcons name="report" size={18} color="red" /> },

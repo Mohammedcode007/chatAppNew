@@ -51,15 +51,16 @@ export function useJoinGroup(userId: string) {
     };
   }, [ws]);
 
-  const joinGroup = (groupId: string) => {
+ const joinGroup = (groupId: string): Promise<boolean> => {
+  return new Promise((resolve, reject) => {
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
       setError('WebSocket غير متصل');
-      return;
+      return resolve(false);
     }
 
     if (!groupId.trim()) {
       setError('معرف المجموعة لا يمكن أن يكون فارغًا');
-      return;
+      return resolve(false);
     }
 
     setLoading(true);
@@ -73,8 +74,45 @@ export function useJoinGroup(userId: string) {
       userId,
     };
 
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const data: JoinGroupResponse = JSON.parse(event.data);
+
+        if (data.type === 'join_group_success' && data.groupId === groupId) {
+          setJoinedGroupId(data.groupId);
+          setSuccessMessage('تم الانضمام إلى المجموعة بنجاح');
+          setLoading(false);
+          setError(null);
+          ws.current?.removeEventListener('message', handleMessage);
+          resolve(true);
+        } else if (data.type === 'join_group_failed' && data.groupId === groupId) {
+          if (data.message === 'You are already a member of this group.') {
+            setJoinedGroupId(data.groupId ?? null);
+            setSuccessMessage('أنت بالفعل عضو في هذه المجموعة');
+            setError(null);
+            setLoading(false);
+            ws.current?.removeEventListener('message', handleMessage);
+            resolve(true); // نعتبرها ناجحة
+          } else {
+            setError(data.message || 'فشل الانضمام إلى المجموعة');
+            setLoading(false);
+            ws.current?.removeEventListener('message', handleMessage);
+            resolve(false);
+          }
+        }
+      } catch (err) {
+        setError('حدث خطأ أثناء معالجة رد السيرفر');
+        setLoading(false);
+        ws.current?.removeEventListener('message', handleMessage);
+        resolve(false);
+      }
+    };
+
+    ws.current.addEventListener('message', handleMessage);
     ws.current.send(JSON.stringify(message));
-  };
+  });
+};
+
 
   return {
     joinedGroupId,

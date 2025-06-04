@@ -20,6 +20,7 @@ import { useGroupMessages } from '@/Hooks/useGroupMessages';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MessageInput from '@/components/MessageInput';
 import GroupMessageItem from '@/components/GroupMessageItem';
+import DraggableFAB from '@/components/DraggableFAB';
 
 type Message = {
   _id: string; // معرف حقيقي أو وهمي يبدأ بـ "temp-"
@@ -181,6 +182,9 @@ export default function GroupChatScreen() {
         onSend={sendTextMessage}
         darkMode={darkMode}
       />
+      {/** الزر العائم */}
+      <DraggableFAB onSearchPress={() => console.log('فتح البحث')} messages={localMessages} />
+
     </KeyboardAvoidingView>
   );
 }

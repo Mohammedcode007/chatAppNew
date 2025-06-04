@@ -24,32 +24,10 @@ import { useLeaveGroup } from '@/Hooks/useLeaveGroup';
 import { useJoinGroup } from '@/Hooks/useJoinGroup';
 import { useGroupMembers } from '@/Hooks/useGroupMembers';
 
-const initialGroupChats = [
-  {
-    id: '1',
-    name: 'Work Friends',
-    membersCount: 20,
-    lastMessage: 'The final file was sent yesterday. Please confirm.',
-    members: [
-      { id: 'u1', avatar: 'https://randomuser.me/api/portraits/men/32.jpg' },
-      { id: 'u2', avatar: 'https://randomuser.me/api/portraits/women/45.jpg' },
-      { id: 'u3', avatar: 'https://randomuser.me/api/portraits/men/12.jpg' },
-    ],
-  },
-  {
-    id: '2',
-    name: 'Family',
-    membersCount: 5,
-    lastMessage: 'Dinner at 9?',
-    members: [
-      { id: 'u1', avatar: 'https://randomuser.me/api/portraits/women/41.jpg' },
-      { id: 'u2', avatar: 'https://randomuser.me/api/portraits/men/23.jpg' },
-    ],
-  },
-];
+
 
 export default function GroupChatsScreen() {
-  const [groupChats, setGroupChats] = useState(initialGroupChats);
+  const [groupChats, setGroupChats] = useState([]);
   const [language, setLanguage] = useState('en');
   const { darkMode, toggleDarkMode } = useThemeMode();
   const isRTL = language === 'ar';
@@ -93,70 +71,78 @@ export default function GroupChatsScreen() {
   const { groups, loading, error, fetchGroups } = useAllGroups(userData?._id);
   const { groups: favoriteGroups, loading: loadingFavorites, error: errorFavorites, fetchFavoriteGroups } = useFavoriteGroups(userData?._id);
   const { groups: userGroups, loading: loadingUserGroups, error: errorUserGroups, fetchUserGroups } = useUserGroups(userData?._id);
-  const { leaveGroup: requestLeaveGroup, loading: isLeaving, error: leaveError, successMessage: leaveSuccess } = useLeaveGroup(userData?._id);
+  const { leaveGroup, loading: isLeaving, error: leaveError, successMessage: leaveSuccess } = useLeaveGroup(userData?._id);
   const { joinGroup, successMessage, joinedGroupId } = useJoinGroup(userData?._id || '');
   const [groupNameForUrl, setGroupNameForUrl] = useState<string>('');
-  const [selectedGroup, setSelectedGroup] = useState<any>(null);
   const [shouldJoin, setShouldJoin] = useState(false);
-
-  const { members, loading: loadingMembers, error: membersError } = useGroupMembers(selectedGroup?._id || null);
-
-
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [loadingGroup, setLoadingGroup] = useState(false);
 
-  const handleJoin = (item: any) => {
-    if (item && item._id) {
-      setLoadingGroup(true);
-      setGroupNameForUrl(item.name);
-      setSelectedGroup(item);
-      hasEnteredRoom.current = false; // إعادة تعيين حالة الدخول
-    } else {
-      console.error('معرف المجموعة غير موجود');
+  const [pendingJoinGroup, setPendingJoinGroup] = useState<any>(null); // تخزين المجموعة المراد الانضمام إليها
+
+  const { members, loading: loadingMembers, error: membersError } = useGroupMembers(selectedGroupId);
+
+  useEffect(() => {
+    // عندما تنتهي عملية جلب الأعضاء ويتوفر pendingJoinGroup
+    if (!loadingMembers && pendingJoinGroup) {
+      const isAlreadyMember = members.some((member) => member._id === userData?._id);
+
+      if (isAlreadyMember) {
+        // المستخدم عضو بالفعل
+        setGroupNameForUrl(pendingJoinGroup.name);
+        router.push(`/group/${pendingJoinGroup._id}?name=${encodeURIComponent(pendingJoinGroup.name)}`);
+        setPendingJoinGroup(null);
+        setLoadingGroup(false);
+      } else {
+        // المستخدم ليس عضوًا، حاول الانضمام
+        joinGroup(pendingJoinGroup._id)
+          .then((success) => {
+            if (success) {
+              setGroupNameForUrl(pendingJoinGroup.name);
+              router.push(`/group/${pendingJoinGroup._id}?name=${encodeURIComponent(pendingJoinGroup.name)}`);
+            }
+          })
+          .catch((error) => {
+            console.error('فشل الانضمام للمجموعة:', error);
+          })
+          .finally(() => {
+            setPendingJoinGroup(null);
+            setLoadingGroup(false);
+          });
+      }
     }
+  }, [loadingMembers, pendingJoinGroup, members]);
+
+  const handleJoin = (item: any) => {
+    if (!userData?._id || !item?._id) return;
+
+    setLoadingGroup(true);
+    setSelectedGroupId(item._id);   // لتحديث الـ hook وجلب الأعضاء
+    setPendingJoinGroup(item);      // تخزين المجموعة للانتظار حتى تكتمل البيانات
   };
 
-  // تحقق ودخول الغرفة عند تحديث الأعضاء
-  const [isMember, setIsMember] = useState(false);
-
-  useEffect(() => {
-    if (!selectedGroup || !members || !userData) return;
-
-    const memberCheck = members.some(
-      (member) => String(member._id).trim() === String(userData._id).trim()
-    );
-
-    if (memberCheck) {
-      setIsMember(true);
-      if (!hasEnteredRoom.current) {
-        router.push(`/group/${selectedGroup._id}?name=${encodeURIComponent(groupNameForUrl)}`);
-        hasEnteredRoom.current = true;
-        setLoadingGroup(false);
-      }
-    } else {
-      setIsMember(false);
-      // نفذ طلب الانضمام فقط ولا توجه أو تجلب رسائل
-      joinGroup(selectedGroup._id);
-    }
-  }, [members, selectedGroup, userData]);
 
 
 
-  // تابع نجاح الانضمام - عند نجاح الانضمام، يصبح isMember true تلقائياً بسبب تحديث أعضاء المجموعة (members)
-  useEffect(() => {
-    if (shouldJoin && successMessage && joinedGroupId && !hasEnteredRoom.current) {
-      setIsMember(true);
-      router.push(`/group/${joinedGroupId}?name=${encodeURIComponent(groupNameForUrl)}`);
-      setShouldJoin(false);
-      setLoadingGroup(false);
-      hasEnteredRoom.current = true;
-    }
-  }, [successMessage, joinedGroupId, shouldJoin]);
+
+
 
 
 
   // خروج من المجموعة
-  const handleLeaveGroup = (groupid: string) => {
-    requestLeaveGroup(groupid);
+  const handleLeaveGroup = async (groupid: string) => {
+
+    const success = await leaveGroup(groupid)
+
+    if (success) {
+      console.log('تم الخروج بنجاح');
+      setSelectedGroupId(null); // هذا سيفرغ الأعضاء من useGroupMembers
+
+      fetchUserGroups()
+
+    } else {
+      console.log('فشل الخروج من المجموعة');
+    }
   };
 
   useEffect(() => {
@@ -210,10 +196,12 @@ export default function GroupChatsScreen() {
     return (
       <TouchableOpacity
         style={[styles.card, darkMode && styles.cardDark, isRTL && styles.rtlRow]}
-        onPress={() =>
-          handleJoin(item)
-        }
+        onPress={() => {
+          setSelectedGroupId(item._id);
+          handleJoin(item);
+        }}
       >
+
         <View style={[styles.row, isRTL && styles.rtlRow]}>
           <View style={[styles.avatarsRow, isRTL && styles.rtlAvatarsRow]}>
             {displayAvatars.map((member: any, index: number) => {
@@ -286,6 +274,7 @@ export default function GroupChatsScreen() {
 
 
   const renderHiddenItem = (data: any) => (
+
     <View style={[styles.hiddenRow, isRTL && styles.rtlHiddenRow]}>
       <TouchableOpacity
         style={styles.actionButtonPin}

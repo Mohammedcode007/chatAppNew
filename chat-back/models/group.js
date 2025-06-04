@@ -21,7 +21,11 @@ const groupSchema = new mongoose.Schema({
 
   lastMessage: { type: mongoose.Schema.Types.ObjectId, ref: 'GroupMessage', default: null },
 
-  logs: [{ type: String }],
+logs: [{
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  action: String,
+  timestamp: { type: Date, default: Date.now }
+}],
 
   inviteLink: { type: String, default: '' },
 
