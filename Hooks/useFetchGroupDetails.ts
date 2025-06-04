@@ -12,6 +12,7 @@ interface GroupDetails {
   welcomeMessageText: string;
   welcomeMessageEnabled: boolean;
   autoDeleteMessagesAfterHours: number;
+  password:string;
   points: number;
   creator: { _id: string; username: string; avatar: string | null };
   members: Array<{ _id: string; username: string; avatar: string | null }>;

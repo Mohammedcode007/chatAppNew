@@ -134,44 +134,41 @@ const updateGroupRole = async ({ groupId, actorUserId, targetUserId, roleType, r
     if (idx !== -1) arr.splice(idx, 1);
   }
 
-  // احصل على قائمة الأعضاء (members)
   const members = group.members || [];
 
   if (roleAction === 'add') {
     if (roleType === 'block') {
-      // إزالة المستخدم من كل الأدوار بما في ذلك members
+      // إزالة من كل الأدوار + الأعضاء (member) عند الحظر
       allRoles.concat(['member']).forEach(r => removeUserFromRole(r));
-      // ثم إضافة الحظر
-      group.blocks = group.blocks || [];
-      if (!group.blocks.some(id => id.toString() === idStr)) {
-        group.blocks.push(targetUserId);
+
+      // إضافة الحظر
+      group.blocked = group.blocked || [];
+      if (!group.blocked.some(id => id.toString() === idStr)) {
+        group.blocked.push(targetUserId);
       }
     } else {
-      // عادي: إضافة دور غير الحظر
-      // إزالة من دور الحظر أولًا
-      removeUserFromRole('block');
+      // إزالة المستخدم من جميع الأدوار السابقة (creator, owner, admin, block) قبل الإضافة
+      allRoles.forEach(r => removeUserFromRole(r));
 
-      // إزالة المستخدم من الدور المطلوب إذا موجود (لتجنب التكرار)
+      // إضافة الدور الجديد
       const roleArray = group[roleType + 's'] || [];
-      const idx = roleArray.findIndex(id => id.toString() === idStr);
-      if (idx === -1) {
+      if (!roleArray.some(id => id.toString() === idStr)) {
         roleArray.push(targetUserId);
         group[roleType + 's'] = roleArray;
       }
 
-      // في حال إضافة عضو جديد، تأكد أنه ضمن members
-      if (roleType !== 'member') {
-        if (!members.some(id => id.toString() === idStr)) {
-          members.push(targetUserId);
-          group.members = members;
-        }
+      // إضافة العضو إلى قائمة الأعضاء members إذا غير موجود
+      if (!members.some(id => id.toString() === idStr)) {
+        members.push(targetUserId);
+        group.members = members;
       }
     }
   } else { // roleAction === 'remove'
     if (roleType === 'block') {
       // إزالة الحظر
       removeUserFromRole('block');
-      // إعادة المستخدم لقائمة الأعضاء members إذا لم يكن فيها
+
+      // إعادة المستخدم لقائمة الأعضاء members إذا غير موجود
       if (!members.some(id => id.toString() === idStr)) {
         members.push(targetUserId);
         group.members = members;

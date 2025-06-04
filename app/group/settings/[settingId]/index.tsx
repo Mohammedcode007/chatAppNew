@@ -773,6 +773,7 @@ import {
   Alert,
   Modal,
   Pressable,
+  TextInput,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -780,6 +781,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFetchGroupDetails } from '@/Hooks/useFetchGroupDetails';
 import { useUpdateGroupRole } from '@/Hooks/useUpdateGroupRole';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Picker } from '@react-native-picker/picker';
+
 
 function getFirstParam(param: string | string[] | undefined): string {
   if (!param) return '';
@@ -792,29 +795,65 @@ export default function GroupSettingsScreen() {
   const groupId = getFirstParam(params.groupId);
 
   const { groupDetails, loading, error, fetchGroupDetails } = useFetchGroupDetails();
-  const { loading: updatingRole, error: roleError, successMessage, updateGroupRole } = useUpdateGroupRole();
+
+  const {
+    loading: updatingRole,
+    error: roleError,
+    successMessage,
+    updateGroupRole,
+  } = useUpdateGroupRole();
 
   const [selectedUser, setSelectedUser] = useState<any>(null);
+
   const [modalVisible, setModalVisible] = useState(false);
+
   const [userData, setUserData] = useState<any>(null);
+  const [editedDescription, setEditedDescription] = useState('');
+  const [editedWelcomeMessage, setEditedWelcomeMessage] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [groupStatus, setGroupStatus] = useState<'public' | 'private'>('public');
+  const [password, setPassword] = useState('');
+
+  useEffect(() => {
+    if (groupDetails) {
+      setGroupStatus(groupDetails.isPublic ? 'public' : 'private');
+      setPassword(groupDetails.password || '');
+    }
+  }, [groupDetails]);
+  useEffect(() => {
+    if (groupDetails) {
+      setEditedDescription(groupDetails.description || '');
+      setEditedWelcomeMessage(groupDetails.welcomeMessageText || '');
+    }
+  }, [groupDetails]);
 
   useEffect(() => {
     const fetchUserData = async () => {
       try {
         const userDataString = await AsyncStorage.getItem('userData');
         if (userDataString) {
-          const userData = JSON.parse(userDataString);
-          setUserData(userData);
+          const parsedUserData = JSON.parse(userDataString);
+          setUserData(parsedUserData);
         }
       } catch (error) {
-        console.error('Error fetching user data:', error);
+        console.error('حدث خطأ أثناء جلب بيانات المستخدم:', error);
       }
     };
-
     fetchUserData();
   }, []);
-  // يجب تعيين هذا إلى معرف المستخدم الحالي الحقيقي
+
   const currentUserId = userData?._id;
+  let currentUserRole = 'member';
+
+  if (groupDetails?.creator?._id === currentUserId) {
+    currentUserRole = 'creator';
+  } else if (groupDetails?.owners?.some((owner: any) => owner._id === currentUserId)) {
+    currentUserRole = 'owner';
+  } else if (groupDetails?.admins?.some((admin: any) => admin._id === currentUserId)) {
+    currentUserRole = 'admin';
+  } else if (groupDetails?.blocked?.some((blocked: any) => blocked._id === currentUserId)) {
+    currentUserRole = 'blocked';
+  }
 
   useEffect(() => {
     if (groupId) {
@@ -822,21 +861,41 @@ export default function GroupSettingsScreen() {
     }
   }, [groupId]);
 
+
   const openRoleModal = (member: any) => {
     setSelectedUser(member);
     setModalVisible(true);
   };
 
-  const handleUpdateRole = async (roleType: 'admin' | 'owner' | 'block', roleAction: 'add' | 'remove') => {
-    if (!selectedUser || !groupId) return;
+
+  const handleUpdateRole = async (
+    roleType: 'admin' | 'owner' | 'block',
+    roleAction: 'add' | 'remove'
+  ) => {
+    if (!selectedUser || !groupId || !currentUserId || !currentUserRole) return;
+
+    // Prevent regular members from changing any roles
+    if (currentUserRole === 'member') {
+      Alert.alert('Permission Denied', 'You are not authorized to manage roles.');
+      return;
+    }
+
+    // Prevent admins from modifying or removing the owner
+    if (
+      currentUserRole === 'admin' &&
+      roleType === 'owner'
+    ) {
+      Alert.alert('Permission Denied', 'Admins cannot modify or remove the group owner.');
+      return;
+    }
 
     const confirmed = await new Promise<boolean>((resolve) => {
       Alert.alert(
-        'تأكيد',
-        `هل تريد ${roleAction === 'add' ? 'إضافة' : 'إزالة'} دور ${roleType} للمستخدم ${selectedUser.username}؟`,
+        'Confirmation',
+        `Are you sure you want to ${roleAction === 'add' ? 'add' : 'remove'} the ${roleType} role for user ${selectedUser.username}?`,
         [
-          { text: 'إلغاء', onPress: () => resolve(false), style: 'cancel' },
-          { text: 'تأكيد', onPress: () => resolve(true) },
+          { text: 'Cancel', onPress: () => resolve(false), style: 'cancel' },
+          { text: 'Confirm', onPress: () => resolve(true) },
         ]
       );
     });
@@ -852,42 +911,73 @@ export default function GroupSettingsScreen() {
     });
 
     if (success) {
-      fetchGroupDetails(groupId);
+      await fetchGroupDetails(groupId);
       setModalVisible(false);
     }
   };
 
-  const renderMember = (member: any) => {
+  const renderMemberCard = (member: any) => {
     if (!groupDetails) return null;
 
-    const isOwner = groupDetails.creator?._id === member._id;
-    const isCurrentUserOwner = groupDetails.creator?._id === currentUserId;
+    const isCreator = groupDetails.creator?._id === member._id;
+    const isOwner = groupDetails.owners?.some((owner: any) => owner._id === member._id);
+    const isAdmin = groupDetails.admins?.some((admin: any) => admin._id === member._id);
+    const isBlocked = groupDetails.blocked?.some((blocked: any) => blocked._id === member._id);
+
+    let nameColor = '#4CAF50';
+    if (isCreator) {
+      nameColor = '#FFD700';
+    } else if (isOwner) {
+      nameColor = '#D32F2F';
+    } else if (isAdmin) {
+      nameColor = '#1976D2';
+    } else if (isBlocked) {
+      nameColor = '#555555';
+    }
+
+    const handlePress = () => {
+      if (!isCreator) {
+        openRoleModal(member);
+      }
+    };
 
     return (
-      <View key={member._id} style={styles.memberContainer}>
+      <TouchableOpacity
+        key={member._id}
+        style={styles.memberCard}
+        onPress={handlePress}
+        activeOpacity={isCreator ? 1 : 0.8}
+      >
         <Image
-          source={member.avatar ? { uri: member.avatar } : require('../../../../assets/images/coin.jpg')}
-          style={styles.avatar}
+          source={
+            member.avatar
+              ? { uri: member.avatar }
+              : require('../../../../assets/images/coin.jpg')
+          }
+          style={styles.memberAvatar}
         />
-        <Text style={styles.memberName} numberOfLines={1} ellipsizeMode="tail">{member.username}</Text>
-
-          <TouchableOpacity
-            style={styles.roleButton}
-            onPress={() => openRoleModal(member)}
-            activeOpacity={0.7}
+        <View style={styles.memberInfo}>
+          <Text
+            style={[styles.memberName, { color: nameColor }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
           >
-            <Ionicons name="settings-outline" size={22} color="#007AFF" />
-          </TouchableOpacity>
-        
-      </View>
+            {member.username}
+            {isCreator && ' 👑'}
+          </Text>
+        </View>
+        {!isCreator && <Ionicons name="settings-outline" size={24} color="#007AFF" />}
+      </TouchableOpacity>
     );
   };
+
+
 
   if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={{ marginTop: 14, fontSize: 16, color: '#555' }}>جاري تحميل تفاصيل المجموعة...</Text>
+        <Text style={styles.loadingText}>Loading group details...</Text>
       </View>
     );
   }
@@ -896,13 +986,13 @@ export default function GroupSettingsScreen() {
     return (
       <View style={styles.center}>
         <Ionicons name="alert-circle-outline" size={56} color="#D32F2F" />
-        <Text style={{ color: '#D32F2F', marginTop: 14, fontSize: 17, fontWeight: '600' }}>{error}</Text>
+        <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity
           style={styles.retryButton}
           onPress={() => fetchGroupDetails(groupId)}
           activeOpacity={0.8}
         >
-          <Text style={styles.retryText}>إعادة المحاولة</Text>
+          <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
       </View>
     );
@@ -911,14 +1001,14 @@ export default function GroupSettingsScreen() {
   if (!groupDetails) {
     return (
       <View style={styles.center}>
-        <Text style={{ fontSize: 16, color: '#666' }}>لا توجد بيانات لعرضها.</Text>
+        <Text style={styles.noDataText}>No data to display.</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
-      <View style={styles.header}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 50 }}>
+      <View style={styles.groupHeader}>
         <Image
           source={
             groupDetails.avatar
@@ -927,237 +1017,352 @@ export default function GroupSettingsScreen() {
           }
           style={styles.groupAvatar}
         />
-        <Text style={styles.groupName} numberOfLines={1} ellipsizeMode="tail">{groupDetails.name}</Text>
-        <Text style={styles.groupTag}>#{groupDetails.tag}</Text>
-      </View>
-
-      {groupDetails.description ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>الوصف</Text>
-          <Text style={styles.sectionContent}>{groupDetails.description}</Text>
+        <View style={{ flex: 1, marginLeft: 15 }}>
+          <Text style={styles.groupName}>{groupDetails.name}</Text>
+          <Text style={styles.groupTag}>#{groupDetails.tag}</Text>
         </View>
-      ) : null}
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>حالة المجموعة</Text>
-        <Text style={styles.sectionContent}>
-          {groupDetails.isPublic ? 'مفتوحة للعامة' : 'مقفلة / خاصة'}
-        </Text>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>رسالة الترحيب</Text>
-        <Text style={styles.sectionContent}>
-          {groupDetails.welcomeMessageEnabled
-            ? groupDetails.welcomeMessageText || 'لا توجد رسالة ترحيب محددة'
-            : 'ميزة رسالة الترحيب غير مفعلة'}
-        </Text>
+     <TouchableOpacity
+        style={styles.editButton}
+        onPress={async () => {
+          setIsEditing(!isEditing); // بدء التعديل
+
+        }}
+      >
+        <Text style={styles.editButtonText}>{isEditing ? 'Save' : 'Edit'}</Text>
+      </TouchableOpacity>
+
+      <View style={styles.infoSection}>
+        <Text style={styles.sectionTitle}>Group Status</Text>
+
+        {isEditing ? (
+          <>
+            <Picker
+              selectedValue={groupStatus}
+              onValueChange={(itemValue) => setGroupStatus(itemValue)}
+              style={styles.picker}
+            >
+              <Picker.Item label="Public" value="public" />
+              <Picker.Item label="Private" value="private" />
+            </Picker>
+
+            {groupStatus === 'private' && (
+              <TextInput
+                placeholder="Enter password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                style={styles.input}
+              />
+            )}
+          </>
+        ) : (
+          <Text style={styles.sectionContent}>
+            {groupDetails.isPublic ? 'Public' : 'Private / Closed'}
+          </Text>
+        )}
       </View>
+ 
+      <View style={styles.infoSection}>
+        <Text style={styles.sectionTitle}>Description</Text>
+        {isEditing ? (
+          <TextInput
+            style={styles.input}
+            value={editedDescription}
+            onChangeText={setEditedDescription}
+            multiline
+          />
+        ) : (
+          <Text style={styles.sectionContent}>
+            {groupDetails.description || 'No description available'}
+          </Text>
+        )}
+      </View>
+
+      <View style={styles.infoSection}>
+        <Text style={styles.sectionTitle}>Welcome Message</Text>
+        {isEditing ? (
+          <TextInput
+            style={styles.input}
+            value={editedWelcomeMessage}
+            onChangeText={setEditedWelcomeMessage}
+            multiline
+          />
+        ) : (
+          <Text style={styles.sectionContent}>
+            {groupDetails.welcomeMessageEnabled
+              ? groupDetails.welcomeMessageText || 'No welcome message set'
+              : 'Welcome message feature is disabled'}
+          </Text>
+        )}
+      </View>
+
 
       {groupDetails.pinMessage ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>الرسالة المثبتة</Text>
+        <View style={styles.infoSection}>
+          <Text style={styles.sectionTitle}>Pinned Message</Text>
           <Text style={styles.sectionContent}>{groupDetails.pinMessage}</Text>
         </View>
       ) : null}
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>المالك</Text>
-        {groupDetails.creator ? renderMember(groupDetails.creator) : <Text style={styles.sectionContent}>غير محدد</Text>}
+      <View style={styles.membersSection}>
+        <Text style={styles.sectionTitle}>Creator</Text>
+        {groupDetails.creator ? renderMemberCard(groupDetails.creator) : <Text>Not specified</Text>}
       </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>المديرين</Text>
+      <View style={styles.membersSection}>
+        <Text style={styles.sectionTitle}>Owners</Text>
+        {groupDetails.owners && groupDetails.owners.length > 0 ? (
+          groupDetails.owners.map((owner: any) => renderMemberCard(owner))
+        ) : (
+          <Text style={styles.noMembersText}>No owners</Text>
+        )}
+      </View>
+      <View style={styles.membersSection}>
+        <Text style={styles.sectionTitle}>Admins</Text>
         {groupDetails.admins && groupDetails.admins.length > 0 ? (
-          groupDetails.admins.map(renderMember)
+          groupDetails.admins.map((admin: any) => renderMemberCard(admin))
         ) : (
-          <Text style={styles.sectionContent}>لا يوجد مديرين</Text>
+          <Text style={styles.noMembersText}>No admins</Text>
         )}
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>الأعضاء</Text>
+      <View style={styles.membersSection}>
+        <Text style={styles.sectionTitle}>Members</Text>
         {groupDetails.members && groupDetails.members.length > 0 ? (
-          groupDetails.members.map(renderMember)
+          groupDetails.members.map((member: any) => renderMemberCard(member))
         ) : (
-          <Text style={styles.sectionContent}>لا يوجد أعضاء</Text>
+          <Text style={styles.noMembersText}>No members</Text>
         )}
       </View>
 
-      <TouchableOpacity
-        style={styles.refreshButton}
-        onPress={() => fetchGroupDetails(groupId)}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="refresh" size={24} color="#fff" />
-        <Text style={styles.refreshText}>تحديث البيانات</Text>
-      </TouchableOpacity>
+      <View style={styles.membersSection}>
+        <Text style={styles.sectionTitle}>Blocked Users</Text>
+        {groupDetails.blocked && groupDetails.blocked.length > 0 ? (
+          groupDetails.blocked.map((blocked: any) => renderMemberCard(blocked))
+        ) : (
+          <Text style={styles.noMembersText}>No blocked users</Text>
+        )}
+      </View>
 
       <Modal
+        animationType="fade"
+        transparent
         visible={modalVisible}
-        animationType="slide"
-        transparent={true}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalBackground}>
+        <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>تعديل صلاحيات المستخدم</Text>
-            <Text style={styles.modalUser}>{selectedUser?.username}</Text>
+            <Text style={styles.modalTitle}>Edit Member Permissions</Text>
+            {selectedUser && (
+              <>
+                <Text style={styles.modalUsername}>{selectedUser.username}</Text>
 
-            <View style={styles.modalButtonsContainer}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.modalButton,
-                  pressed && styles.buttonPressed,
-                ]}
-                onPress={() => handleUpdateRole('admin', 'add')}
-                disabled={updatingRole}
-              >
-                <Text style={styles.modalButtonText}>إضافة مدير</Text>
-              </Pressable>
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={() => handleUpdateRole('admin', 'add')}
+                  disabled={updatingRole}
+                >
+                  <Text style={styles.modalButtonText}>Add Admin</Text>
+                </TouchableOpacity>
 
-              <Pressable
-                style={({ pressed }) => [
-                  styles.modalButton,
-                  pressed && styles.buttonPressed,
-                ]}
-                onPress={() => handleUpdateRole('admin', 'remove')}
-                disabled={updatingRole}
-              >
-                <Text style={styles.modalButtonText}>إزالة مدير</Text>
-              </Pressable>
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={() => handleUpdateRole('admin', 'remove')}
+                  disabled={updatingRole}
+                >
+                  <Text style={styles.modalButtonText}>Remove Admin</Text>
+                </TouchableOpacity>
 
-              <Pressable
-                style={({ pressed }) => [
-                  styles.modalButton,
-                  pressed && styles.buttonPressed,
-                  { backgroundColor: '#D32F2F' },
-                ]}
-                onPress={() => handleUpdateRole('block', 'add')}
-                disabled={updatingRole}
-              >
-                <Text style={styles.modalButtonText}>حظر المستخدم</Text>
-              </Pressable>
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={() => handleUpdateRole('owner', 'add')}
+                  disabled={updatingRole}
+                >
+                  <Text style={styles.modalButtonText}>Assign Owner</Text>
+                </TouchableOpacity>
 
-              <Pressable
-                style={({ pressed }) => [
-                  styles.modalButton,
-                  pressed && styles.buttonPressed,
-                  { backgroundColor: '#777' },
-                ]}
-                onPress={() => setModalVisible(false)}
-                disabled={updatingRole}
-              >
-                <Text style={styles.modalButtonText}>إلغاء</Text>
-              </Pressable>
-            </View>
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={() => handleUpdateRole('owner', 'remove')}
+                  disabled={updatingRole}
+                >
+                  <Text style={styles.modalButtonText}>Remove Owner</Text>
+                </TouchableOpacity>
 
-            {updatingRole && <ActivityIndicator size="small" color="#007AFF" />}
-            {roleError && <Text style={{ color: '#D32F2F', marginTop: 8 }}>{roleError}</Text>}
-            {successMessage && <Text style={{ color: '#388E3C', marginTop: 8 }}>{successMessage}</Text>}
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.blockButton]}
+                  onPress={() => handleUpdateRole('block', 'add')}
+                  disabled={updatingRole}
+                >
+                  <Text style={[styles.modalButtonText, { color: '#fff' }]}>Block Member</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.blockButton]}
+                  onPress={() => handleUpdateRole('block', 'remove')}
+                  disabled={updatingRole}
+                >
+                  <Text style={[styles.modalButtonText, { color: '#fff' }]}>Unblock Member</Text>
+                </TouchableOpacity>
+
+                {roleError && <Text style={styles.errorText}>{roleError}</Text>}
+                {successMessage && <Text style={styles.successText}>{successMessage}</Text>}
+              </>
+            )}
           </View>
-        </View>
+        </Pressable>
       </Modal>
+
+
     </ScrollView>
   );
+
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 12,
+    flex: 1,
     backgroundColor: '#fff',
-    flex: 1,
-  },
-  header: {
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  groupAvatar: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    marginBottom: 12,
-  },
-  groupName: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  groupTag: {
-    fontSize: 14,
-    color: '#666',
-  },
-  section: {
-    marginBottom: 20,
-    paddingHorizontal: 4,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 6,
-    color: '#222',
-  },
-  sectionContent: {
-    fontSize: 16,
-    color: '#444',
-  },
-  memberContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 6,
-    backgroundColor: '#f9f9f9',
-    padding: 8,
-    borderRadius: 8,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  memberName: {
-    flex: 1,
-    fontSize: 16,
-    color: '#222',
-  },
-  roleButton: {
-    padding: 6,
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#555',
+  },
+  errorText: {
+    color: '#D32F2F',
+    fontSize: 16,
+    marginTop: 10,
+  },
+  successText: {
+    color: 'green',
+    fontSize: 16,
+    marginTop: 10,
+  },
   retryButton: {
-    marginTop: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    marginTop: 15,
     backgroundColor: '#007AFF',
-    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 25,
+    borderRadius: 5,
   },
   retryText: {
     color: '#fff',
-    fontWeight: '600',
+    fontSize: 16,
   },
-  refreshButton: {
+  noDataText: {
+    fontSize: 16,
+    color: '#999',
+  },
+  groupHeader: {
+    flexDirection: 'row',
+    padding: 20,
+    alignItems: 'center',
+    borderBottomColor: '#ddd',
+    borderBottomWidth: 1,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
+    marginTop: 8,
+  },
+
+  editButton: {
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginVertical: 10,
+    marginHorizontal: 16,
+  },
+
+  editButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+
+  groupAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#ccc',
+  },
+  groupName: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  groupTag: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+  },
+  infoSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomColor: '#eee',
+    borderBottomWidth: 1,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 5,
+    color: '#222',
+  },
+  sectionContent: {
+    fontSize: 16,
+    color: '#444',
+  },
+  membersSection: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  noMembersText: {
+    fontSize: 16,
+    color: '#999',
+    marginTop: 5,
+  },
+  memberCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#007AFF',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    marginBottom: 40,
+    paddingVertical: 12,
+    borderBottomColor: '#ddd',
+    borderBottomWidth: 1,
   },
-  refreshText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+  memberAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#ccc',
   },
-  modalBackground: {
+  memberInfo: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    marginLeft: 15,
+  },
+  memberName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#222',
+  },
+  ownerBadge: {
+    fontSize: 13,
+    color: '#007AFF',
+    marginTop: 2,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
@@ -1165,37 +1370,44 @@ const styles = StyleSheet.create({
   modalContainer: {
     backgroundColor: '#fff',
     width: '100%',
-    borderRadius: 12,
+    borderRadius: 10,
     padding: 20,
     alignItems: 'center',
+    elevation: 5,
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  modalUser: {
-    fontSize: 18,
-    marginBottom: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
     color: '#333',
   },
-  modalButtonsContainer: {
-    width: '100%',
-    marginBottom: 10,
+  modalUsername: {
+    fontSize: 18,
+    marginBottom: 20,
+    color: '#555',
   },
   modalButton: {
     backgroundColor: '#007AFF',
     paddingVertical: 12,
-    borderRadius: 8,
-    marginVertical: 6,
+    paddingHorizontal: 25,
+    borderRadius: 6,
+    marginVertical: 5,
+    width: '100%',
     alignItems: 'center',
   },
   modalButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
   },
-  buttonPressed: {
-    opacity: 0.75,
+  blockButton: {
+    backgroundColor: '#D32F2F',
   },
+
+
+
+  picker: {
+    height: 50,
+    width: '100%',
+  },
+
 });
