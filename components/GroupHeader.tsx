@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Modal, Pressable, TextInput } from 'react-native';
 import { Text } from '@/components/Themed';
 import { Ionicons, Entypo, Feather, MaterialIcons, AntDesign } from '@expo/vector-icons';
 import { useThemeMode } from '@/context/ThemeContext';
 import { useNavigation, useRouter } from 'expo-router';
 import { useLeaveGroup } from '@/Hooks/useLeaveGroup';
+import { useAllFriends } from '@/Hooks/useAllFriends';
+import InviteModal from './InviteModal';
 
 type Props = {
   title: string;
-  membersCount?: number;
+  membersCount?: string;
   settingId: string;
   userId: string;
   groupId: string;
@@ -18,6 +20,14 @@ type Props = {
 export default function GroupHeader({ title, membersCount, settingId, userId, groupId }: Props) {
   const { darkMode } = useThemeMode();
   const navigation = useNavigation();
+  const [inviteVisible, setInviteVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const { friends, loading: friendsLoading, refreshFriends } = useAllFriends();
+  const filteredFriends = friends?.filter(friend =>
+    friend.username.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+console.log(membersCount,'membersCount');
+
   const [menuVisible, setMenuVisible] = useState(false);
   const router = useRouter();
   const {
@@ -28,13 +38,13 @@ export default function GroupHeader({ title, membersCount, settingId, userId, gr
     leftGroupId,
   } = useLeaveGroup(userId);
 
-  const handleLeave = async() => {
+  const handleLeave = async () => {
 
-     const success = await leaveGroup(groupId)
+    const success = await leaveGroup(groupId)
 
     if (success) {
       console.log('تم الخروج بنجاح');
-     
+
 
     } else {
       console.log('فشل الخروج من المجموعة');
@@ -47,12 +57,12 @@ export default function GroupHeader({ title, membersCount, settingId, userId, gr
         handleLeave()
         break;
       case 'settings':
-  router.push(`/group/settings/${settingId}?userId=${encodeURIComponent(userId)}&groupId=${encodeURIComponent(groupId)}`);
+        router.push(`/group/settings/${settingId}?userId=${encodeURIComponent(userId)}&groupId=${encodeURIComponent(groupId)}`);
 
         // فتح صفحة الإعدادات
         break;
       case 'invite':
-        // فتح نافذة الدعوة
+        setInviteVisible(true);
         break;
       case 'report':
         // فتح واجهة الإبلاغ
@@ -79,9 +89,9 @@ export default function GroupHeader({ title, membersCount, settingId, userId, gr
 
       <View style={{ flex: 1 }}>
         <Text style={[styles.title, darkMode && { color: '#fff' }]}>{title}</Text>
-        {typeof membersCount === 'number' && (
+        {typeof membersCount === 'string' && (
           <Text style={[styles.subTitle, darkMode && { color: '#aaa' }]}>
-            {membersCount} أعضاء
+            {membersCount} members
           </Text>
         )}
       </View>
@@ -108,6 +118,14 @@ export default function GroupHeader({ title, membersCount, settingId, userId, gr
           </View>
         </Pressable>
       </Modal>
+      <InviteModal
+        visible={inviteVisible}
+        onClose={() => setInviteVisible(false)}
+        groupId={groupId}
+        actorUserId={userId}
+      />
+
+
     </View>
   );
 }
@@ -165,4 +183,50 @@ const styles = StyleSheet.create({
     color: '#333',
     marginLeft: 8,
   },
+  inviteModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inviteModalContainer: {
+    width: '85%',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 16,
+    maxHeight: '70%',
+  },
+  inviteTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginBottom: 10,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+  },
+  friendItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  friendName: {
+    fontSize: 16,
+    color: '#333',
+  },
+
 });

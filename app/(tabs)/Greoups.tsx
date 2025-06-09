@@ -79,6 +79,7 @@ export default function GroupChatsScreen() {
   const [loadingGroup, setLoadingGroup] = useState(false);
 
   const [pendingJoinGroup, setPendingJoinGroup] = useState<any>(null); // تخزين المجموعة المراد الانضمام إليها
+console.log(pendingJoinGroup,"pendingJoinGroup");
 
   const { members, loading: loadingMembers, error: membersError } = useGroupMembers(selectedGroupId);
 
@@ -90,7 +91,7 @@ export default function GroupChatsScreen() {
       if (isAlreadyMember) {
         // المستخدم عضو بالفعل
         setGroupNameForUrl(pendingJoinGroup.name);
-        router.push(`/group/${pendingJoinGroup._id}?name=${encodeURIComponent(pendingJoinGroup.name)}`);
+        router.push(`/group/${pendingJoinGroup._id}?name=${encodeURIComponent(pendingJoinGroup.name)}&description=${encodeURIComponent(pendingJoinGroup.description)}&members=${encodeURIComponent(members.length)}`);
         setPendingJoinGroup(null);
         setLoadingGroup(false);
       } else {
@@ -99,7 +100,7 @@ export default function GroupChatsScreen() {
           .then((success) => {
             if (success) {
               setGroupNameForUrl(pendingJoinGroup.name);
-              router.push(`/group/${pendingJoinGroup._id}?name=${encodeURIComponent(pendingJoinGroup.name)}`);
+              router.push(`/group/${pendingJoinGroup._id}?name=${encodeURIComponent(pendingJoinGroup.name)}&description=${encodeURIComponent(pendingJoinGroup.description)}&members=${encodeURIComponent(members.length)}`);
             }
           })
           .catch((error) => {
@@ -189,88 +190,102 @@ export default function GroupChatsScreen() {
           : groupChats;
 
 
-  const renderItem = ({ item }: { item: any }) => {
-    const displayAvatars = (item.members || []).slice(0, 2);
-    const remaining = (item.members?.length || 0) - displayAvatars.length;
+const renderItem = ({ item }: { item: any }) => {
+  const displayAvatars = (item.members || []).slice(0, 2);
+  const remaining = (item.members?.length || 0) - displayAvatars.length;
 
-    return (
-      <TouchableOpacity
-        style={[styles.card, darkMode && styles.cardDark, isRTL && styles.rtlRow]}
-        onPress={() => {
-          setSelectedGroupId(item._id);
-          handleJoin(item);
+  return (
+    <TouchableOpacity
+      style={{
+        flexDirection: isRTL ? 'row-reverse' : 'row',
+        alignItems: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderBottomWidth: 0.5,
+        borderColor: darkMode ? '#333' : '#ddd',
+        backgroundColor: darkMode ? '#121212' : '#fff',
+      }}
+      onPress={() => {
+        setSelectedGroupId(item._id);
+        handleJoin(item);
+      }}
+    >
+      {/* صورة أول عضو فقط */}
+      <Image
+        source={{ uri: displayAvatars[0]?.avatar || 'https://via.placeholder.com/50' }}
+        style={{
+          width: 42,
+          height: 42,
+          borderRadius: 21,
+          marginRight: isRTL ? 0 : 12,
+          marginLeft: isRTL ? 12 : 0,
         }}
-      >
+      />
 
-        <View style={[styles.row, isRTL && styles.rtlRow]}>
-          <View style={[styles.avatarsRow, isRTL && styles.rtlAvatarsRow]}>
-            {displayAvatars.map((member: any, index: number) => {
+      {/* محتوى المجموعة */}
+      <View style={{ flex: 1 }}>
+        {/* اسم المجموعة + الأيقونات */}
+        <View
+          style={{
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <Text
+            style={{
+              fontWeight: 'bold',
+              color: darkMode ? '#fff' : '#000',
+              fontSize: 15,
+              flexShrink: 1,
+            }}
+            numberOfLines={1}
+          >
+            {item.name}
+          </Text>
 
-              const key = typeof member === 'object' && member._id ? member._id : `avatar-${index}`;
-              return (
-                <Image
-                  key={key}
-                  source={{
-                    uri: member?.avatar || 'https://via.placeholder.com/50',
-                  }}
-                  style={[
-                    styles.avatar,
-                    isRTL
-                      ? { marginRight: index === 0 ? 0 : -30 }
-                      : { marginLeft: index === 0 ? 0 : -30 },
-                  ]}
-                />
-              );
-            })}
-
-            {remaining > 0 && (
-              <View
-                style={[
-                  styles.avatar,
-                  styles.remainingAvatar,
-                  isRTL ? { marginRight: -30 } : { marginLeft: -30 },
-                ]}
-              >
-                <Text style={styles.remainingText}>+{remaining}</Text>
-              </View>
+          {/* أيقونات الخصوصية */}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {!item.isPublic && (
+              <Ionicons name="lock-closed" size={16} color={darkMode ? '#aaa' : '#777'} />
+            )}
+            {item.password && (
+              <Ionicons name="key" size={16} color={darkMode ? '#aaa' : '#777'} style={{ marginLeft: 4 }} />
             )}
           </View>
-
-          <View style={styles.info}>
-            <View style={[styles.nameRow, isRTL && styles.rtlRow]}>
-              <Text style={[styles.name, darkMode && styles.textDark]}>
-                {item.name}
-              </Text>
-              <Text style={[styles.dot, darkMode && styles.textDark]}> · </Text>
-              <View
-                style={[
-                  { flexDirection: 'row', alignItems: 'center' },
-                  isRTL && { flexDirection: 'row-reverse' },
-                ]}
-              >
-                <Ionicons
-                  name="people"
-                  size={16}
-                  color={darkMode ? '#ccc' : '#888'}
-                  style={{ marginRight: isRTL ? 0 : 4, marginLeft: isRTL ? 4 : 0 }}
-                />
-                <Text style={[styles.membersCount, darkMode && styles.textDark]}>
-                  {item.members?.length || 0}
-                </Text>
-              </View>
-            </View>
-            <Text
-              style={[styles.lastMessage, darkMode && styles.textDark]}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {i18n.t('Last message')}: {item.lastMessage || '—'}
-            </Text>
-          </View>
         </View>
-      </TouchableOpacity>
-    );
-  };
+
+        {/* الرسالة الأخيرة */}
+        {item.lastMessage?.text && (
+          <Text
+            style={{
+              color: darkMode ? '#aaa' : '#666',
+              fontSize: 13,
+              marginTop: 2,
+            }}
+            numberOfLines={1}
+          >
+            {i18n.t('Last message')}: {item.lastMessage.text}
+          </Text>
+        )}
+
+        {/* عدد الأعضاء */}
+        <View
+          style={{
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+            alignItems: 'center',
+            marginTop: 4,
+          }}
+        >
+          <Ionicons name="people" size={14} color={darkMode ? '#aaa' : '#666'} />
+          <Text style={{ marginHorizontal: 4, fontSize: 13, color: darkMode ? '#aaa' : '#666' }}>
+            {item.members?.length || 0}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 
   const renderHiddenItem = (data: any) => (

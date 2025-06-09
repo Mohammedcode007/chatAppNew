@@ -18,6 +18,7 @@ export type Message = {
     _id: string;
     username: string;
     avatar?: string;
+    badge?: string;
   };
   timestamp: number;
   isTemporary?: boolean;
@@ -51,7 +52,6 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
 
 
 
-console.log(isSystemMessage);
 
   return (
     <View
@@ -67,8 +67,8 @@ console.log(isSystemMessage);
           resizeMode="cover"
         />
       )}
-      {isSystemMessage ? (<View style={{ alignItems: 'center', marginVertical: 6 ,flex:1,justifyContent:"center"}}>
-        <Text style={{ color: 'red', fontSize: 14 }}>{item.text}</Text>
+      {isSystemMessage ? (<View style={{ alignItems: 'center', marginVertical: 6, flex: 1, justifyContent: "center" }}>
+        <Text style={{ color: 'red', fontSize: 10 }}>{item.text}</Text>
       </View>) : (<View style={styles.messageWrapper}>
         {/* ذيل الرسالة */}
         <View
@@ -99,7 +99,7 @@ console.log(isSystemMessage);
           ]}
         >
           {/* اسم المرسل يظهر فقط للرسائل الغير خاصة بي */}
-          {!isMyMessage && item.sender && (
+          {item.sender && (
             <View
               style={{
                 backgroundColor: darkMode ? '#444' : '#ddd',
@@ -111,8 +111,11 @@ console.log(isSystemMessage);
               }}
             >
               <Text style={{ color: colors.usernameText, fontSize: 12 }}>
-                {item.sender?.username || 'مستخدم'}
+                {isMyMessage
+                  ? `${item.sender?.username || 'مستخدم'} ${item.sender?.badge || ''}`
+                  : `${item.sender?.badge || ''} ${item.sender?.username || 'مستخدم'}`}
               </Text>
+
             </View>
           )}
 
@@ -194,11 +197,14 @@ const styles = StyleSheet.create({
     marginRight: 8,
     borderWidth: 2,
   },
-  messageText: {
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: '500',
-  },
+messageText: {
+  fontSize: 16,
+  lineHeight: 24,
+  fontWeight: '500',
+  textAlign: 'right',     // يجعل بداية النص من اليمين
+  writingDirection: 'rtl' // يدعم لغات تكتب من اليمين مثل العربية
+},
+
   imageMessage: {
     width: 220,
     height: 160,

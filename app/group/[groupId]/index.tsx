@@ -36,22 +36,14 @@ type Message = {
 
 };
 
-const formatTime = (timestamp: number): string => {
-  const date = new Date(timestamp);
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  const isAM = hours < 12;
-  const formattedHours = (hours % 12 || 12).toString().padStart(2, '0');
-  const formattedMinutes = minutes.toString().padStart(2, '0');
-  const period = isAM ? 'ص' : 'م';
-  return `${formattedHours}:${formattedMinutes} ${period}`;
-};
+
 
 export default function GroupChatScreen() {
-  const { groupId, name } = useLocalSearchParams<{ groupId: string; name?: string }>();
+  const { groupId, name, description,members } = useLocalSearchParams<{ groupId: string; name?: string, description?: string,members?: string }>();
   const { darkMode } = useThemeMode();
   const [userData, setUserData] = useState<any>(null);
   const [senderType, setSenderType] = useState<'user' | 'system'>('user');
+console.log(members);
 
   const { messages, loading, error, sendMessage } = useGroupMessages(groupId, userData?._id || '');
   const [inputText, setInputText] = useState('');
@@ -141,16 +133,29 @@ export default function GroupChatScreen() {
       // هنا يمكن إضافة إعلام المستخدم بالفشل
     }
   };
+  const displayMessages = [
+    { _id: 'static-header', type: 'header' },
+    ...localMessages,
+  ];
 
   // عرض الرسائل مع التفريق بين رسائل المستخدم والآخرين
-  const renderMessage = ({ item }: { item: Message }) => {
-    const isMyMessage = item.sender?._id === userData?._id;
+  const renderMessage = ({ item }: { item: Message | { _id: string, type: string } }) => {
+    if (item.type === 'header') {
+      if (description !== "") {
+        return (
+          <View style={styles.headerContainer}>
+            <Text style={styles.headerText}>{description}</Text>
+          </View>
+        );
+      } else {
+        return null; // لا تعرض شيء إطلاقًا إذا كان الوصف فارغ
+      }
+    }
 
-    return (
-      <GroupMessageItem item={item} currentUserId={userData?._id} />
-
-    );
+    return <GroupMessageItem item={item as Message} currentUserId={userData?._id} />;
   };
+
+
 
   return (
     <KeyboardAvoidingView
@@ -160,7 +165,7 @@ export default function GroupChatScreen() {
     >
       <GroupHeader
         title={name || 'المجموعة'}
-        membersCount={12}
+        membersCount={members}
         settingId="45"
         userId={userData?._id}
         groupId={groupId}
@@ -168,13 +173,14 @@ export default function GroupChatScreen() {
 
       <FlatList
         ref={flatListRef}
-        data={localMessages}
+        data={displayMessages}
         keyExtractor={(item) => item._id}
         renderItem={renderMessage}
         contentContainerStyle={styles.messagesList}
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
         onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
       />
+
 
       <MessageInput
         inputText={inputText}
@@ -243,4 +249,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  headerContainer: {
+    padding: 10,
+    backgroundColor: '#e6f7ff',
+    borderRadius: 10,
+    marginBottom: 10,
+    alignSelf: 'center',
+  },
+  headerText: {
+    fontSize: 14,
+    color: '#007acc',
+  },
+
 });

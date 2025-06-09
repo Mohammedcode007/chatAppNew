@@ -288,7 +288,7 @@ console.log(userData,'userData');
               <Ionicons name="create-outline" size={20} color="#FFF" />
             </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={() => openEditModal('username', userData.username)}>
+          <TouchableOpacity style={{flexDirection: 'row', justifyContent: 'center', alignItems: 'center'}} onPress={() => openEditModal('username', userData.username)}>
             <Text style={[styles.name, { color: theme.text }]}>
               {userData.username}{' '}
               {userData.verified && (
@@ -299,7 +299,7 @@ console.log(userData,'userData');
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => openEditModal('status', userData.status || '')}
-            style={{ marginTop: 5 }}
+            style={{ marginTop: 5,flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}
           >
             <Text style={[{ color: theme.subText, fontStyle: 'italic' }]}>
               {userData.status || 'لا توجد حالة حالية'}
@@ -586,10 +586,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 6,
   },
-  name: { fontSize: 22, fontWeight: 'bold', marginTop: 8 },
+  name: { fontSize: 15, fontWeight: 'bold', marginTop: 8,alignItems:"center",justifyContent:"center" },
   statsRow: {
     flexDirection: 'row',
     marginTop: 12,
+    
     justifyContent: 'space-between',
     width: '80%',
   },

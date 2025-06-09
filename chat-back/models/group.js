@@ -13,7 +13,10 @@ const groupSchema = new mongoose.Schema({
   owners: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   admins: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   blocked: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-
+  membersJoinedAt: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    joinedAt: { type: Date, default: Date.now }
+  }],
   creator: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
   // الرسائل كمصفوفة من مراجع Message
@@ -21,21 +24,21 @@ const groupSchema = new mongoose.Schema({
 
   lastMessage: { type: mongoose.Schema.Types.ObjectId, ref: 'GroupMessage', default: null },
 
-logs: [{
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  action: String,
-  timestamp: { type: Date, default: Date.now }
-}],
+  logs: [{
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    action: String,
+    timestamp: { type: Date, default: Date.now }
+  }],
 
   inviteLink: { type: String, default: '' },
 
   pinMessage: { type: mongoose.Schema.Types.ObjectId, ref: 'GroupMessage', default: null },
 
-  welcomeMessageText: { 
-    type: String, 
-    default: "مرحباً بك في المجموعة! نتمنى لك وقتاً ممتعاً معنا." 
+  welcomeMessageText: {
+    type: String,
+    default: "مرحباً بك في المجموعة! نتمنى لك وقتاً ممتعاً معنا."
   },
-    points: { type: Number, default: 0 },  // نقاط الغرفة التي ترتفع عند الضغط على "Post"
+  points: { type: Number, default: 0 },  // نقاط الغرفة التي ترتفع عند الضغط على "Post"
 
 
   welcomeMessageEnabled: { type: Boolean, default: true },

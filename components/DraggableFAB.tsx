@@ -78,21 +78,21 @@ export default function DraggableFAB({ messages, onSearchPress }: Props) {
   ).current;
 
   // دالة لتحديث نتائج البحث بناءً على النص
- const handleSearch = (text: string) => {
-  setSearchText(text);
-  if (text.trim() === '') {
-    setResults([]);
-    setCurrentIndex(0);
-    return;
-  }
-const filteredMessages = messages.filter((msg: { text: string; }) =>
-  msg.text.toLowerCase().includes(text.toLowerCase())
-);
-// ثم تخزن filteredMessages أو نصوصها حسب حاجتك
+  const handleSearch = (text: string) => {
+    setSearchText(text);
+    if (text.trim() === '') {
+      setResults([]);
+      setCurrentIndex(0);
+      return;
+    }
+    const filteredMessages = messages.filter((msg: { text: string; }) =>
+      msg.text.toLowerCase().includes(text.toLowerCase())
+    );
+    // ثم تخزن filteredMessages أو نصوصها حسب حاجتك
 
-setResults(filteredMessages.map(msg => msg.text));  // خزن النصوص فقط
-  setCurrentIndex(0);
-};
+    setResults(filteredMessages.map(msg => msg.text));  // خزن النصوص فقط
+    setCurrentIndex(0);
+  };
 
   // التنقل بين النتائج
   const goNext = () => {
@@ -196,8 +196,8 @@ setResults(filteredMessages.map(msg => msg.text));  // خزن النصوص فق�
                       <Ionicons name="arrow-forward" size={24} color="#2196F3" />
                     </TouchableOpacity>
                   </View>
-                  
-                  
+
+
                   <Text style={{ textAlign: 'center', marginTop: 8 }}>
                     نتيجة {currentIndex + 1} من {results.length}
                   </Text>

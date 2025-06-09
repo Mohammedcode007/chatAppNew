@@ -128,11 +128,19 @@ const updateGroupRole = async ({ groupId, actorUserId, targetUserId, roleType, r
   const idStr = targetUserId.toString();
 
   // دالة مساعدة لإزالة المستخدم من أي قائمة أدوار
-  function removeUserFromRole(role) {
-    const arr = group[role + 's'] || [];
-    const idx = arr.findIndex(id => id.toString() === idStr);
-    if (idx !== -1) arr.splice(idx, 1);
+function removeUserFromRole(role) {
+  const arr = role === 'block' ? group.blocked || [] : group[role + 's'] || [];
+  const idx = arr.findIndex(id => id.toString() === idStr);
+  if (idx !== -1) arr.splice(idx, 1);
+
+  // تحديث القيمة في المجموعة بعد التعديل
+  if (role === 'block') {
+    group.blocked = arr;
+  } else {
+    group[role + 's'] = arr;
   }
+}
+
 
   const members = group.members || [];
 
@@ -168,11 +176,7 @@ const updateGroupRole = async ({ groupId, actorUserId, targetUserId, roleType, r
       // إزالة الحظر
       removeUserFromRole('block');
 
-      // إعادة المستخدم لقائمة الأعضاء members إذا غير موجود
-      if (!members.some(id => id.toString() === idStr)) {
-        members.push(targetUserId);
-        group.members = members;
-      }
+
     } else {
       // إزالة الدور فقط
       removeUserFromRole(roleType);
