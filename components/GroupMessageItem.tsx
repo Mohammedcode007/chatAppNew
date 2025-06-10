@@ -1,14 +1,20 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
   Image,
   ActivityIndicator,
   Platform,
+  Alert,
+  TouchableOpacity,
+  ScrollView,
 } from 'react-native';
 import { Text } from '@/components/Themed';
 import { useThemeMode } from '@/context/ThemeContext';
 import AudioMessagePlayer from '@/components/AudioMessagePlayer';
+import CustomBottomSheet from './CustomBottomSheet';
+import { useSendToAllGroups } from '@/Hooks/useSendToAllGroups';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type Message = {
   _id: string;
@@ -37,7 +43,22 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
   const isMyMessage = item?.sender?._id === currentUserId;
   const avatar = item?.sender?.avatar || DEFAULT_AVATAR;
   const isSystemMessage = item.senderType === 'system';
+  const [userData, setUserData] = useState<any>(null);
 
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const userDataString = await AsyncStorage.getItem('userData');
+        if (userDataString) {
+          const parsed = JSON.parse(userDataString);
+          setUserData(parsed);
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+    fetchUserData();
+  }, []);
   const colors = {
     myMessageBg: darkMode ? '#3B7D64' : '#A8D5BA',
     otherMessageBg: darkMode ? '#2E2E2E' : '#F0F0F0',
@@ -49,8 +70,26 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
     tailColorOther: darkMode ? '#2E2E2E' : '#F0F0F0',
     avatarBorder: darkMode ? '#4CAF50' : '#6BAF91',
   };
+  const { sendToAllGroups } = useSendToAllGroups(currentUserId);
 
+  const [optionsVisible, setOptionsVisible] = React.useState(false);
+  const [giftVisible, setGiftVisible] = React.useState(false);
 
+  const handleCopyUsername = () => {
+    // Clipboard.setString(item.sender?.username || '');
+    Alert.alert('تم النسخ', 'تم نسخ اسم المستخدم');
+    setOptionsVisible(false);
+  };
+
+  const handleOpenProfile = () => {
+    Alert.alert('ملف شخصي', 'سيتم فتح الملف الشخصي');
+    setOptionsVisible(false);
+  };
+
+  const handleSendGift = () => {
+    setOptionsVisible(false);
+    setGiftVisible(true);
+  };
 
 
   return (
@@ -61,11 +100,15 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
       ]}
     >
       {!isMyMessage && !isSystemMessage && (
-        <Image
-          source={{ uri: avatar }}
-          style={[styles.avatar, { borderColor: colors.avatarBorder }]}
-          resizeMode="cover"
-        />
+        <TouchableOpacity onPress={() => setOptionsVisible(true)}>
+
+          <Image
+            source={{ uri: avatar }}
+            style={[styles.avatar, { borderColor: colors.avatarBorder }]}
+            resizeMode="cover"
+          />
+        </TouchableOpacity>
+
       )}
       {isSystemMessage ? (<View style={{ alignItems: 'center', marginVertical: 6, flex: 1, justifyContent: "center" }}>
         <Text style={{ color: 'red', fontSize: 10 }}>{item.text}</Text>
@@ -150,7 +193,50 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
           )}
         </View>
       </View>)}
+      <CustomBottomSheet
+        visible={optionsVisible}
+        onClose={() => setOptionsVisible(false)}
+      >
+        <View style={styles.optionContainer}>
+          <TouchableOpacity style={styles.optionButton} onPress={handleCopyUsername}>
+            <Text style={styles.optionText}>📋 Copy Username</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.optionButton} onPress={handleOpenProfile}>
+            <Text style={styles.optionText}>👤 View Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.optionButton} onPress={handleSendGift}>
+            <Text style={styles.optionText}>🎁 Send Gift</Text>
+          </TouchableOpacity>
+        </View>
+      </CustomBottomSheet>
 
+      {/* Gift Bottom Sheet */}
+      <CustomBottomSheet
+        visible={giftVisible}
+        onClose={() => setGiftVisible(false)}
+      >
+        <Text style={styles.giftTitle}>Select a Gift:</Text>
+        <ScrollView horizontal contentContainerStyle={styles.giftScroll}>
+          {['🎉', '🌹', '🍫', '💎', '🎂'].map((emoji, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.emojiWrapper}
+              onPress={() => {
+                sendToAllGroups(
+                  `${item?.sender?.username} received a ${emoji} gift from ${userData?.username} !`,
+                  'text',
+                  'system'
+                );
+
+
+                setGiftVisible(false);
+              }}
+            >
+              <Text style={styles.emoji}>{emoji}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </CustomBottomSheet>
     </View>
   );
 };
@@ -197,13 +283,13 @@ const styles = StyleSheet.create({
     marginRight: 8,
     borderWidth: 2,
   },
-messageText: {
-  fontSize: 16,
-  lineHeight: 24,
-  fontWeight: '500',
-  textAlign: 'right',     // يجعل بداية النص من اليمين
-  writingDirection: 'rtl' // يدعم لغات تكتب من اليمين مثل العربية
-},
+  messageText: {
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: '500',
+    textAlign: 'right',     // يجعل بداية النص من اليمين
+    writingDirection: 'rtl' // يدعم لغات تكتب من اليمين مثل العربية
+  },
 
   imageMessage: {
     width: 220,
@@ -230,6 +316,41 @@ messageText: {
     fontSize: 14,
     textAlign: 'center',
     fontWeight: '600',
+  },
+  optionContainer: {
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+  },
+  optionButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+    borderRadius: 10,
+    backgroundColor: '#f2f2f2',
+  },
+  optionText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  giftTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  giftScroll: {
+    paddingHorizontal: 10,
+    paddingBottom: 10,
+  },
+  emojiWrapper: {
+    backgroundColor: '#f0f0f0',
+    padding: 10,
+    borderRadius: 12,
+    marginHorizontal: 8,
+  },
+  emoji: {
+    fontSize: 32,
   },
 });
 

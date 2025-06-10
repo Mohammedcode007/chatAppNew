@@ -36,7 +36,7 @@ const windowWidth = Dimensions.get('window').width;
 export default function ProfileScreen() {
   const { darkMode, toggleDarkMode } = useThemeMode();
   const [userData, setUserData] = useState<any>(null);
-console.log(userData,'userData');
+  console.log(userData, 'userData');
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -214,34 +214,34 @@ console.log(userData,'userData');
     pickImage('cover');
   };
 
-   const {
-      blockUser,
-      unblockUser,
-      fetchBlockedUsers,
-      isUserBlocked,
-      blockedUsers,
-    } = useBlockUser();
-    useEffect(() => {
-      fetchBlockedUsers(); // سيتم تحميل قائمة المحظورين عند فتح شاشة المحادثة
-    }, []);
-    const [blockedList, setBlockedList] = useState<{ id: string; name: string }[]>([]);
+  const {
+    blockUser,
+    unblockUser,
+    fetchBlockedUsers,
+    isUserBlocked,
+    blockedUsers,
+  } = useBlockUser();
+  useEffect(() => {
+    fetchBlockedUsers(); // سيتم تحميل قائمة المحظورين عند فتح شاشة المحادثة
+  }, []);
+  const [blockedList, setBlockedList] = useState<{ id: string; name: string }[]>([]);
 
-    useEffect(() => {
-  if (blockedUsers && Array.isArray(blockedUsers)) {
-    const transformed = blockedUsers.map((user) => ({
-      id: user.id,
-      name: user.name,
-    }));
-    setBlockedList(transformed);
-  }
-}, [blockedUsers]);
-  const [modalVisibleBlock, setModalVisibleBlock] = useState(false); 
+  useEffect(() => {
+    if (blockedUsers && Array.isArray(blockedUsers)) {
+      const transformed = blockedUsers.map((user) => ({
+        id: user.id,
+        name: user.name,
+      }));
+      setBlockedList(transformed);
+    }
+  }, [blockedUsers]);
+  const [modalVisibleBlock, setModalVisibleBlock] = useState(false);
 
 
- const handleUnblock = (userId: string) => {
-  setBlockedList((prev) => prev.filter((user) => user.id !== userId));
-  unblockUser(userId); // استدعاء دالة رفع الحظر
-};
+  const handleUnblock = (userId: string) => {
+    setBlockedList((prev) => prev.filter((user) => user.id !== userId));
+    unblockUser(userId); // استدعاء دالة رفع الحظر
+  };
 
   if (!userData) {
     return (
@@ -288,7 +288,7 @@ console.log(userData,'userData');
               <Ionicons name="create-outline" size={20} color="#FFF" />
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={{flexDirection: 'row', justifyContent: 'center', alignItems: 'center'}} onPress={() => openEditModal('username', userData.username)}>
+          <TouchableOpacity style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }} onPress={() => openEditModal('username', userData.username)}>
             <Text style={[styles.name, { color: theme.text }]}>
               {userData.username}{' '}
               {userData.verified && (
@@ -299,7 +299,7 @@ console.log(userData,'userData');
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => openEditModal('status', userData.status || '')}
-            style={{ marginTop: 5,flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}
+            style={{ marginTop: 5, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}
           >
             <Text style={[{ color: theme.subText, fontStyle: 'italic' }]}>
               {userData.status || 'لا توجد حالة حالية'}
@@ -495,9 +495,10 @@ console.log(userData,'userData');
           onClose={() => setModalVisibleBlock(false)}
           blockedUsers={blockedList}
           onUnblock={handleUnblock}
-          theme={theme}  />
+          theme={theme} />
 
       </ScrollView>
+   
     </SafeAreaView>
   );
 }
@@ -586,11 +587,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 6,
   },
-  name: { fontSize: 15, fontWeight: 'bold', marginTop: 8,alignItems:"center",justifyContent:"center" },
+  name: { fontSize: 15, fontWeight: 'bold', marginTop: 8, alignItems: "center", justifyContent: "center" },
   statsRow: {
     flexDirection: 'row',
     marginTop: 12,
-    
+
     justifyContent: 'space-between',
     width: '80%',
   },

@@ -1314,6 +1314,107 @@ async function handleMessage(message, ws, userSockets) {
 
 
 
+case 'send_message_to_all_groups': {
+  const { newMessage, messageType = 'text', tempId, senderType } = msg;
+
+  if (!newMessage || typeof newMessage !== 'string' || newMessage.trim() === '') {
+    sendToUser(userSockets, ws.userId, {
+      type: 'send_group_message_failed',
+      message: 'الرسالة فارغة أو غير صالحة.',
+    });
+    break;
+  }
+
+  try {
+    const mongoose = require('mongoose');
+    const Group = require('../../models/group');
+    const GroupMessage = require('../../models/GroupMessage');
+    const User = require('../../models/user');
+
+    const allGroups = await Group.find();
+
+    if (!allGroups || allGroups.length === 0) {
+      sendToUser(userSockets, ws.userId, {
+        type: 'send_group_message_failed',
+        message: 'لا توجد مجموعات لإرسال الرسالة.',
+      });
+      break;
+    }
+
+    let senderDetails = null;
+
+    if (senderType === 'user') {
+      senderDetails = await User.findById(ws.userId).select('_id username avatar badge').lean();
+    } else {
+      senderDetails = {
+        _id: null,
+        username: 'النظام',
+        avatar: null,
+      };
+    }
+
+    for (const group of allGroups) {
+      const newMsgDoc = new GroupMessage({
+        sender: senderType === 'user' ? ws.userId : undefined,
+        senderType,
+        groupId: group._id,
+        text: newMessage.trim(),
+        messageType,
+        timestamp: new Date(),
+        status: 'sent',
+      });
+
+      await newMsgDoc.save();
+
+      group.lastMessage = newMsgDoc._id;
+      await group.save();
+
+      const messageToSend = {
+        _id: newMsgDoc._id.toString(),
+        sender: senderDetails,
+        groupId: group._id.toString(),
+        text: newMsgDoc.text,
+        messageType,
+        senderType,
+        timestamp: newMsgDoc.timestamp.toISOString(),
+        status: 'sent',
+      };
+
+      // إرسال تأكيد للمرسل نفسه
+      sendToUser(userSockets, ws.userId, {
+        type: 'group_message_sent_confirmation',
+        tempId,
+        newMessage: messageToSend,
+        receiver: ws.userId.toString(),
+        groupId: group._id.toString(),
+      });
+
+      // إرسال الرسالة لكل عضو في المجموعة
+      const membersIdsStr = group.members.map(member => member._id.toString());
+
+      membersIdsStr.forEach(memberIdStr => {
+        const userWs = userSockets.get(memberIdStr);
+        if (userWs && userWs.readyState === userWs.OPEN) {
+          userWs.send(JSON.stringify({
+            type: 'new_group_message',
+            groupId: group._id.toString(),
+            newMessage: messageToSend,
+            receiver: memberIdStr,
+          }));
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('Error sending message to all groups:', error);
+    sendToUser(userSockets, ws.userId, {
+      type: 'send_group_message_failed',
+      message: 'حدث خطأ أثناء إرسال الرسائل إلى المجموعات.',
+    });
+  }
+
+  break;
+}
 
 
     case 'send_group_message': {

@@ -43,7 +43,6 @@ export default function GroupChatScreen() {
   const { darkMode } = useThemeMode();
   const [userData, setUserData] = useState<any>(null);
   const [senderType, setSenderType] = useState<'user' | 'system'>('user');
-console.log(members);
 
   const { messages, loading, error, sendMessage } = useGroupMessages(groupId, userData?._id || '');
   const [inputText, setInputText] = useState('');
@@ -53,7 +52,6 @@ console.log(members);
 
   // حالة الرسائل المحلية تشمل الرسائل الوهمية والحقيقية
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
-  console.log(localMessages, '78878787');
 
   useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
