@@ -161,6 +161,13 @@ export default function RootLayout() {
                       animation: 'slide_from_right',
                     }}
                   />
+                    <Stack.Screen
+                    name="/UserProfile"
+                    options={{
+                      headerShown: true,
+                      animation: 'slide_from_right',
+                    }}
+                  />
                   <Stack.Screen
                     name="/CreateGroup"
                     options={{
@@ -177,6 +184,9 @@ export default function RootLayout() {
                       animation: 'slide_from_right',
                     }}
                   />
+                
+
+
                   <Stack.Screen
                     name="/StoreScreens/StoreScreens"
                     options={{

@@ -226,6 +226,106 @@ async function handleMessage(message, ws, userSockets) {
 
       break;
     }
+    case 'get_user_by_id': {
+  const { userId } = msg;
+
+  if (!userId) {
+    return sendToUser(userSockets, ws.userId, {
+      type: 'error',
+      message: 'يجب توفير معرف المستخدم.'
+    });
+  }
+
+  try {
+    const user = await User.findById(userId)
+      .select('-password -__v') // استثناء الحقول الحساسة
+      .populate('friends', 'username')
+      .populate('selectedAvatar selectedFrame selectedEffect selectedBackground', 'name icon');
+
+    if (!user) {
+      return sendToUser(userSockets, ws.userId, {
+        type: 'error',
+        message: 'المستخدم غير موجود.'
+      });
+    }
+
+    sendToUser(userSockets, ws.userId, {
+      type: 'user_data_by_id',
+      user
+    });
+
+  } catch (err) {
+    console.error('خطأ عند جلب بيانات المستخدم:', err);
+    sendToUser(userSockets, ws.userId, {
+      type: 'error',
+      message: 'حدث خطأ أثناء جلب بيانات المستخدم.'
+    });
+  }
+
+  break;
+}
+
+
+case 'update_sensitive_info': {
+  const { currentPassword, updates = {} } = msg;
+  console.log('المدخلات القادمة من العميل:', updates);
+
+  if (!currentPassword) {
+    return sendToUser(userSockets, ws.userId, {
+      type: 'error',
+      message: 'يجب إدخال كلمة المرور الحالية لتحديث البيانات الحساسة.'
+    });
+  }
+
+  const user = await User.findById(ws.userId).select('+password');
+  if (!user) {
+    return sendToUser(userSockets, ws.userId, {
+      type: 'error',
+      message: 'المستخدم غير موجود.'
+    });
+  }
+
+  const bcrypt = require('bcrypt');
+  const isMatch = await bcrypt.compare(currentPassword, user.password);
+  if (!isMatch) {
+    return sendToUser(userSockets, ws.userId, {
+      type: 'error',
+      message: 'كلمة المرور الحالية غير صحيحة.'
+    });
+  }
+
+  const allowedSensitiveFields = ['password', 'email', 'phone', 'gender', 'age', 'birthday', 'country'];
+  const sensitiveUpdate = {};
+
+  for (const key of allowedSensitiveFields) {
+    if (key in updates) {
+      sensitiveUpdate[key] = updates[key];
+    }
+  }
+
+  console.log('تمرير الحقول للتحديث:', sensitiveUpdate);
+
+  if (sensitiveUpdate.password) {
+    const salt = await bcrypt.genSalt(10);
+    sensitiveUpdate.password = await bcrypt.hash(sensitiveUpdate.password, salt);
+  }
+
+  const updateResult = await User.updateOne(
+    { _id: ws.userId },
+    { $set: sensitiveUpdate }
+  );
+  console.log('نتيجة التحديث:', updateResult);
+
+  const updatedSensitiveUser = await User.findById(ws.userId).select('-password -__v');
+
+  sendToUser(userSockets, ws.userId, {
+    type: 'sensitive_info_updated_successfully',
+    user: updatedSensitiveUser
+  });
+
+  break;
+}
+
 
 
     case 'update_status': {

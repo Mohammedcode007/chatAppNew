@@ -29,6 +29,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUserStatus } from '@/Hooks/useUserStatus';
 import BlockedUsersModal from '@/components/BlockedUsersModal';
 import { useBlockUser } from '@/Hooks/useBlockUser';
+import { useSensitiveInfoUpdater } from '@/Hooks/useSensitiveInfoUpdater';
 const windowWidth = Dimensions.get('window').width;
 
 
@@ -123,44 +124,6 @@ export default function ProfileScreen() {
   const { status, error, loading, updateStatus } = useUserStatus('offline');
 
 
-  const handleSave = () => {
-    if (!currentEditKey) return;
-
-    if (currentEditKey === 'birthday') {
-      const y = dateValue.getFullYear();
-      const m = (dateValue.getMonth() + 1).toString().padStart(2, '0');
-      const d = dateValue.getDate().toString().padStart(2, '0');
-      const formattedDate = `${y}-${m}-${d}`;
-
-      setUserData((prev: any) => {
-        const updated = { ...prev, [currentEditKey]: formattedDate };
-        return updated;
-      });
-
-    } else {
-      if (inputValue.trim() === '') {
-        Alert.alert('خطأ', 'القيمة لا يمكن أن تكون فارغة');
-        return;
-      }
-      setUserData((prev: any) => {
-        const updated = { ...prev, [currentEditKey]: inputValue };
-        // هنا نطبع الحالة لو كان currentEditKey = 'status'
-        if (currentEditKey === 'status') {
-          if (!token) {
-            Alert.alert('خطأ', 'التوكن غير موجود، يرجى تسجيل الدخول مجددًا');
-            return;
-          }
-
-          updateStatus(updated.status, token); // الآن token مضمون أنه string
-        }
-
-        return updated;
-      });
-    }
-
-    setModalVisible(false);
-  };
-
 
 
   const onChangeDate = (event: any, selectedDate?: Date) => {
@@ -242,6 +205,85 @@ export default function ProfileScreen() {
     setBlockedList((prev) => prev.filter((user) => user.id !== userId));
     unblockUser(userId); // استدعاء دالة رفع الحظر
   };
+
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [enteredPassword, setEnteredPassword] = useState('');
+
+  const {
+    updateSensitiveInfo,
+    successMessage,
+    errorMessage,
+  } = useSensitiveInfoUpdater();
+
+  useEffect(() => {
+    if (successMessage) {
+      Alert.alert('✅ نجاح', successMessage);
+    } else if (errorMessage) {
+      Alert.alert('❌ خطأ', errorMessage);
+    }
+  }, [successMessage, errorMessage]);
+
+  const handleEdit = (key: string) => {
+    setCurrentEditKey(key);
+    if (key === 'birthday') {
+      setDateValue(userData.birthday ? new Date(userData.birthday) : new Date());
+    } else {
+      setInputValue(userData[key] || '');
+    }
+    setModalVisible(true);
+  };
+
+  const handleSave = () => {
+    if (!currentEditKey) return;
+
+    if (currentEditKey === 'birthday') {
+      setPasswordModalVisible(true); // نطلب كلمة المرور قبل التعديل
+    } else {
+      if (inputValue.trim() === '') {
+        Alert.alert('خطأ', 'القيمة لا يمكن أن تكون فارغة');
+        return;
+      }
+      setPasswordModalVisible(true); // نطلب كلمة المرور قبل التعديل
+    }
+  };
+  const handleConfirmPasswordAndSave = () => {
+    if (!enteredPassword) {
+      Alert.alert('خطأ', 'يرجى إدخال كلمة المرور');
+      return;
+    }
+
+    if (!currentEditKey) return;
+
+    if (currentEditKey === 'birthday') {
+      const y = dateValue.getFullYear();
+      const m = (dateValue.getMonth() + 1).toString().padStart(2, '0');
+      const d = dateValue.getDate().toString().padStart(2, '0');
+      const formattedDate = `${y}-${m}-${d}`;
+
+      setUserData((prev: any) => {
+        const updated = { ...prev, birthday: formattedDate };
+        updateSensitiveInfo(enteredPassword, { birthday: formattedDate });
+        return updated;
+      });
+    } else {
+      setUserData((prev: any) => {
+        const updated = { ...prev, [currentEditKey]: inputValue };
+
+        const sensitiveKeys = ['email', 'phone', 'password', 'gender', 'country'];
+        if (sensitiveKeys.includes(currentEditKey)) {
+          updateSensitiveInfo(enteredPassword, { [currentEditKey]: inputValue });
+        }
+
+        return updated;
+      });
+    }
+
+    setPasswordModalVisible(false);
+    setModalVisible(false);
+    setEnteredPassword('');
+  };
+
+
 
   if (!userData) {
     return (
@@ -338,22 +380,8 @@ export default function ProfileScreen() {
             onCopy={handleCopy}
             onEdit={() => openEditModal('country', userData.country)}
           />
-          <InfoItem
-            icon="eye-outline"
-            label="Views"
-            value={userData.views.toString()}
-            theme={theme}
-            onCopy={handleCopy}
-            onEdit={() => openEditModal('views', userData.views.toString())}
-          />
-          <InfoItem
-            icon="chatbubble-ellipses-outline"
-            label="Messages"
-            value={userData.messages.toString()}
-            theme={theme}
-            onCopy={handleCopy}
-            onEdit={() => openEditModal('messages', userData.messages.toString())}
-          />
+     
+   
           <InfoItem
             icon="mail-outline"
             label="Email"
@@ -498,7 +526,30 @@ export default function ProfileScreen() {
           theme={theme} />
 
       </ScrollView>
-   
+      <Modal visible={passwordModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: theme.card }]}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>تأكيد كلمة المرور</Text>
+            <TextInput
+              placeholder="أدخل كلمة المرور"
+              secureTextEntry
+              placeholderTextColor={theme.subText}
+              value={enteredPassword}
+              onChangeText={setEnteredPassword}
+              style={[styles.input, { color: theme.text, borderColor: theme.border }]}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <TouchableOpacity onPress={() => setPasswordModalVisible(false)} style={styles.modalButton}>
+                <Text style={{ color: 'red' }}>إلغاء</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleConfirmPasswordAndSave} style={styles.modalButton}>
+                <Text style={{ color: 'green' }}>تأكيد</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -708,6 +759,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+
+
 
 });
 

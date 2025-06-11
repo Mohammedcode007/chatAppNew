@@ -15,6 +15,7 @@ import AudioMessagePlayer from '@/components/AudioMessagePlayer';
 import CustomBottomSheet from './CustomBottomSheet';
 import { useSendToAllGroups } from '@/Hooks/useSendToAllGroups';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 
 export type Message = {
   _id: string;
@@ -74,6 +75,7 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
 
   const [optionsVisible, setOptionsVisible] = React.useState(false);
   const [giftVisible, setGiftVisible] = React.useState(false);
+  const router = useRouter();
 
   const handleCopyUsername = () => {
     // Clipboard.setString(item.sender?.username || '');
@@ -82,9 +84,13 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
   };
 
   const handleOpenProfile = () => {
-    Alert.alert('ملف شخصي', 'سيتم فتح الملف الشخصي');
+    router.push({
+      pathname: '/UserProfile',
+      params: { userId: item.sender._id },
+    });
     setOptionsVisible(false);
   };
+
 
   const handleSendGift = () => {
     setOptionsVisible(false);
