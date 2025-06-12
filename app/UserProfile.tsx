@@ -71,7 +71,7 @@ export default function UserProfileScreen() {
             <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
             <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={{ position: 'relative' }}>
-                    <Image source={{ uri: userData.cover || "https://i.pinimg.com/736x/17/1a/6c/171a6c7b6bce25e1664c0d7315251e46.jpg" }} style={styles.coverImage} />
+                    <Image source={{ uri: userData.coverUrl || "https://i.pinimg.com/736x/17/1a/6c/171a6c7b6bce25e1664c0d7315251e46.jpg" }} style={styles.coverImage} />
 
                 </View>
 
@@ -86,7 +86,7 @@ export default function UserProfileScreen() {
 
                 <View style={styles.profileSection}>
                     <View style={{ position: 'relative' }}>
-                        <Image source={{ uri: userData.avatar || "https://i.pravatar.cc/150?img=12" }} style={styles.avatar} />
+                        <Image source={{ uri: userData.avatarUrl || "https://i.pravatar.cc/150?img=12" }} style={styles.avatar} />
 
                     </View>
                     <Text style={[styles.name, { color: theme.text }]}>

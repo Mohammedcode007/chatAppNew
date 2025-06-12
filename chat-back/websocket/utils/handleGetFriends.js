@@ -10,7 +10,7 @@ async function handleGetFriends(ws, data) {
 
     const user = await User.findById(userId).populate({
       path: 'friends',
-      select: 'username avatar status', // حدد الحقول التي تريد إرسالها
+      select: 'username avatarUrl status', // حدد الحقول التي تريد إرسالها
     });
 
     if (!user) {

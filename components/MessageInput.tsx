@@ -1,73 +1,309 @@
+// // components/MessageInput.tsx
+// import React from 'react';
+// import {
+//   View,
+//   TextInput,
+//   StyleSheet,
+//   TouchableOpacity,
+//   Platform,
+//   KeyboardAvoidingView,
+// } from 'react-native';
+// import { Ionicons } from '@expo/vector-icons';
+
+// type Props = {
+//   inputText: string;
+//   onChangeText: (text: string) => void;
+//   onSend: () => void;
+//   darkMode: boolean;
+// };
+
+// export default function MessageInput({ inputText, onChangeText, onSend, darkMode }: Props) {
+//   return (
+//     <KeyboardAvoidingView
+//       behavior={Platform.OS === "ios" ? "padding" : undefined}
+//       keyboardVerticalOffset={80}
+//       style={{
+//         backgroundColor: darkMode ? "#121212" : "#ffffff",
+//       }}
+//     >
+//       <View style={[styles.inputContainer, darkMode && { backgroundColor: '#222' }]}>
+//         <TextInput
+//           style={[styles.textInput, darkMode && { color: '#fff' }]}
+//           value={inputText}
+//           onChangeText={onChangeText}
+//           placeholder="اكتب رسالة..."
+//           placeholderTextColor={darkMode ? '#aaa' : '#888'}
+//           multiline
+//         />
+//         <TouchableOpacity
+//           onPress={onSend}
+//           style={[styles.iconButton, { marginLeft: 8 }]}
+//           disabled={!inputText.trim()}
+//         >
+//           <Ionicons
+//             name="send"
+//             size={28}
+//             color={inputText.trim() ? (darkMode ? '#0af' : '#007aff') : '#ccc'}
+//           />
+//         </TouchableOpacity>
+//       </View>
+//     </KeyboardAvoidingView>
+//   );
+// }
+
+// const styles = StyleSheet.create({
+//   inputContainer: {
+//     flexDirection: 'row',
+//     padding: 8,
+//     borderTopWidth: 1,
+//     borderColor: '#ddd',
+//     backgroundColor: '#fff',
+//   },
+//   textInput: {
+//     flex: 1,
+//     fontSize: 16,
+//     paddingHorizontal: 12,
+//     paddingVertical: Platform.OS === 'ios' ? 12 : 8,
+//     maxHeight: 100,
+//   },
+//   iconButton: {
+//     justifyContent: 'center',
+//     alignItems: 'center',
+//   },
+// });
+
 // components/MessageInput.tsx
-import React from 'react';
+import React, { useRef, useEffect } from "react";
 import {
   View,
   TextInput,
+  TouchableWithoutFeedback,
   StyleSheet,
-  TouchableOpacity,
-  Platform,
   KeyboardAvoidingView,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+  Platform,
+  Animated,
+  Easing,
+} from "react-native";
+import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 
 type Props = {
   inputText: string;
   onChangeText: (text: string) => void;
   onSend: () => void;
   darkMode: boolean;
+  pickAndUploadImage: () => void;
+  isRecording: boolean;
+  startRecording: () => void;
+  stopRecording: () => void;
+  insetsBottom: number;
 };
 
-export default function MessageInput({ inputText, onChangeText, onSend, darkMode }: Props) {
+export default function MessageInput({
+  inputText,
+  onChangeText,
+  onSend,
+  darkMode,
+  pickAndUploadImage,
+  isRecording,
+  startRecording,
+  stopRecording,
+  insetsBottom,
+}: Props) {
+  const rotation = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const waveformAnim = useRef(new Animated.Value(0.4)).current;
+
+  useEffect(() => {
+    if (isRecording) {
+      Animated.loop(
+        Animated.timing(rotation, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      ).start();
+
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(waveformAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(waveformAnim, {
+            toValue: 0.4,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      rotation.stopAnimation();
+      rotation.setValue(0);
+      waveformAnim.stopAnimation();
+      waveformAnim.setValue(0.4);
+    }
+  }, [isRecording]);
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.9,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const spin = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+
   return (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={80}
-          style={{
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={80}
+      style={{
+        backgroundColor: darkMode ? "#121212" : "#ffffff",
+      }}
+    >
+      <View
+        style={[
+          styles.inputContainer,
+          {
             backgroundColor: darkMode ? "#121212" : "#ffffff",
-          }}
-        >
-    <View style={[styles.inputContainer, darkMode && { backgroundColor: '#222' }]}>
-      <TextInput
-        style={[styles.textInput, darkMode && { color: '#fff' }]}
-        value={inputText}
-        onChangeText={onChangeText}
-        placeholder="اكتب رسالة..."
-        placeholderTextColor={darkMode ? '#aaa' : '#888'}
-        multiline
-      />
-      <TouchableOpacity
-        onPress={onSend}
-        style={[styles.iconButton, { marginLeft: 8 }]}
-        disabled={!inputText.trim()}
+            paddingBottom: insetsBottom || 0,
+            borderTopColor: darkMode ? "#444" : "#ddd",
+          },
+        ]}
       >
-        <Ionicons
-          name="send"
-          size={28}
-          color={inputText.trim() ? (darkMode ? '#0af' : '#007aff') : '#ccc'}
-        />
-      </TouchableOpacity>
-    </View>
+        <View
+          style={[
+            styles.inputWrapper,
+            {
+              backgroundColor: darkMode ? "#1e1e1e" : "#f0f0f0",
+            },
+          ]}
+        >
+          <TextInput
+            style={[
+              styles.input,
+              { color: darkMode ? "#fff" : "#000" },
+            ]}
+            placeholder="اكتب رسالة..."
+            placeholderTextColor={darkMode ? "#888" : "#999"}
+            value={inputText}
+            onChangeText={onChangeText}
+            multiline
+            textAlignVertical="top"
+          />
+
+          <View style={styles.iconsWrapper}>
+            <TouchableWithoutFeedback
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              onPress={pickAndUploadImage}
+            >
+              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                <MaterialIcons name="image" size={20} color="#007AFF" style={styles.icon} />
+              </Animated.View>
+            </TouchableWithoutFeedback>
+
+            <TouchableWithoutFeedback
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              onPress={isRecording ? stopRecording : startRecording}
+            >
+              <Animated.View style={[{ marginHorizontal: 6 }, isRecording && { transform: [{ rotate: spin }] }]}>
+                <MaterialIcons
+                  name={isRecording ? "stop" : "keyboard-voice"}
+                  size={20}
+                  color={isRecording ? "red" : "#007AFF"}
+                />
+              </Animated.View>
+            </TouchableWithoutFeedback>
+
+            {isRecording && (
+              <Animated.View
+                style={[
+                  styles.waveform,
+                  {
+                    transform: [{ scaleY: waveformAnim }],
+                    backgroundColor: "red",
+                  },
+                ]}
+              />
+            )}
+
+            <TouchableWithoutFeedback
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              onPress={onSend}
+              disabled={!inputText.trim()}
+            >
+              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                <Ionicons
+                  name="send"
+                  size={20}
+                  color={
+                    inputText.trim()
+                      ? (darkMode ? "#0af" : "#007aff")
+                      : "#ccc"
+                  }
+                  style={styles.icon}
+                />
+              </Animated.View>
+            </TouchableWithoutFeedback>
+          </View>
+        </View>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   inputContainer: {
-    flexDirection: 'row',
-    padding: 8,
+    paddingHorizontal: 0,
     borderTopWidth: 1,
-    borderColor: '#ddd',
-    backgroundColor: '#fff',
+    elevation: 6,
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: -2 },
+
   },
-  textInput: {
-    flex: 1,
-    fontSize: 16,
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 0,
     paddingHorizontal: 12,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
-    maxHeight: 100,
+    paddingVertical: 6,
+
   },
-  iconButton: {
-    justifyContent: 'center',
-    alignItems: 'center',
+  input: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    maxHeight: 120,
+
+  },
+  iconsWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  icon: {
+    marginHorizontal: 4,
+  },
+  waveform: {
+    width: 4,
+    height: 20,
+    marginHorizontal: 4,
+    borderRadius: 2,
   },
 });

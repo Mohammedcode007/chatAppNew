@@ -52,6 +52,8 @@ export default function ChatsScreen() {
   const dynamicStyles = styles(darkMode, isRTL);
 
   const { conversations, loading, refreshConversations } = useAllConversations();
+  console.log(conversations);
+  
   useFocusEffect(
     useCallback(() => {
       refreshConversations();
@@ -119,9 +121,8 @@ export default function ChatsScreen() {
                 }
               >
                 <Image
-                  source={{
-                    uri: 'https://i.pinimg.com/736x/b2/7f/9a/b27f9a86eab950fabafa69e6c7cfb6bd.jpg',
-                  }}
+                  source={{ uri: item.withAvatarUrl && item.withAvatarUrl.trim() !== '' ? item.withAvatarUrl : 'https://static.vecteezy.com/system/resources/previews/024/183/525/non_2x/avatar-of-a-man-portrait-of-a-young-guy-illustration-of-male-character-in-modern-color-style-vector.jpg' }}
+
                   style={dynamicStyles.avatar}
                 />
                 <View style={dynamicStyles.chatContent}>

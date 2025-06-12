@@ -14,7 +14,7 @@ type Friend = {
   _id: string;
   username: string;
   status?: string | undefined;
-  avatar?: string;
+  avatarUrl?: string;
 };
 
 
@@ -23,9 +23,8 @@ const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 export default function Friends() {
   const { darkMode } = useThemeMode();
   const user = useSelector((state: RootState) => state.user);
-const { friends, loading, refreshFriends } = useAllFriends();
+  const { friends, loading, refreshFriends } = useAllFriends();
 
-  console.log(friends, "friendStatuses");
 
   const [searchText, setSearchText] = useState('');
   const flatListRef = useRef<FlatList>(null);
@@ -35,23 +34,20 @@ const { friends, loading, refreshFriends } = useAllFriends();
   const isRTL = language === 'ar';
 
 
-const filteredFriends = friends
-  .filter(friend =>
-    friend.username.toLowerCase().includes(searchText.toLowerCase())
-  )
-  .sort((a, b) => {
-    // أولًا حسب الحالة: الأصدقاء "online" يظهرون أولًا
-    if (a.status === "online" && b.status !== "online") {
-      return -1;
-    }
-    if (a.status !== "online" && b.status === "online") {
-      return 1;
-    }
-    // ثانيًا حسب الترتيب الأبجدي حسب الاسم
-    return a.username.localeCompare(b.username, language);
-  });
+  const filteredFriends = friends
+    .filter(friend =>
+      friend.username.toLowerCase().includes(searchText.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (a.status === "online" && b.status !== "online") {
+        return -1;
+      }
+      if (a.status !== "online" && b.status === "online") {
+        return 1;
+      }
+      return a.username.localeCompare(b.username, language);
+    });
 
-  console.log(filteredFriends, '787987987');
 
 
   const scrollToLetter = (letter: string) => {
@@ -72,15 +68,16 @@ const filteredFriends = friends
 
   const renderFriend = ({ item }: { item: Friend }) => (
     <TouchableOpacity style={[styles.friendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-      onPress={() => router.push(    `/chat/${item._id}?name=${encodeURIComponent(item.username)}&status=${item.status}`
-)}
+      onPress={() => router.push(`/chat/${item._id}?name=${encodeURIComponent(item.username)}&status=${item.status}`
+      )}
     >
       <View style={styles.avatarContainer}>
-        <Image source={{ uri: item.avatar }} style={styles.avatar} />
+        <Image source={{ uri: item.avatarUrl && item.avatarUrl.trim() !== '' ? item.avatarUrl : 'https://static.vecteezy.com/system/resources/previews/024/183/525/non_2x/avatar-of-a-man-portrait-of-a-young-guy-illustration-of-male-character-in-modern-color-style-vector.jpg' }}
+          style={styles.avatar} />
         <View
           style={[
             styles.onlineIndicator,
-            { backgroundColor:  item.status ===  "online"? 'green' : 'gray' },
+            { backgroundColor: item.status === "online" ? 'green' : 'gray' },
           ]}
         />
       </View>

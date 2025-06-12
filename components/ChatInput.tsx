@@ -98,6 +98,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         backgroundColor: darkMode ? "#121212" : "#ffffff",
       }}
     >
+      
       <View
         style={[
           styles.inputContainer,

@@ -15,6 +15,8 @@ import {
   TextInput,
   Platform,
   Alert,
+  ToastAndroid,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -30,6 +32,8 @@ import { useUserStatus } from '@/Hooks/useUserStatus';
 import BlockedUsersModal from '@/components/BlockedUsersModal';
 import { useBlockUser } from '@/Hooks/useBlockUser';
 import { useSensitiveInfoUpdater } from '@/Hooks/useSensitiveInfoUpdater';
+import { API_URL } from '@/config';
+import axios from 'axios';
 const windowWidth = Dimensions.get('window').width;
 
 
@@ -37,7 +41,6 @@ const windowWidth = Dimensions.get('window').width;
 export default function ProfileScreen() {
   const { darkMode, toggleDarkMode } = useThemeMode();
   const [userData, setUserData] = useState<any>(null);
-  console.log(userData, 'userData');
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -138,13 +141,12 @@ export default function ProfileScreen() {
     Alert.alert('Copied', 'تم نسخ القيمة إلى الحافظة');
   };
 
-  // دالة اختيار صورة من المعرض وتحديثها حسب نوع الصورة (avatar أو cover)
-  const pickImage = async (type: 'avatar' | 'cover') => {
+  const pickImage = async (type: 'avatarUrl' | 'coverUrl') => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: type === 'avatar' ? [1, 1] : [16, 9],
+        aspect: type === 'avatarUrl' ? [1, 1] : [16, 9],
         quality: 1,
       });
 
@@ -152,15 +154,15 @@ export default function ProfileScreen() {
         const uri = result.assets[0].uri;
         if (!uri) return;
 
-        if (type === 'avatar') {
+        if (type === 'avatarUrl') {
           setUserData((prev: any) => ({
             ...prev,
             avatar: uri,
           }));
-        } else if (type === 'cover') {
+        } else if (type === 'coverUrl') {
           setUserData((prev: any) => ({
             ...prev,
-            cover: uri,
+            coverUrl: uri,
           }));
         }
       }
@@ -169,13 +171,13 @@ export default function ProfileScreen() {
     }
   };
 
-  const editAvatar = () => {
-    pickImage('avatar');
-  };
+  // const editAvatar = () => {
+  //   pickImage('avatarUrl');
+  // };
 
-  const editCover = () => {
-    pickImage('cover');
-  };
+  // const editCover = () => {
+  //   pickImage('coverUrl');
+  // };
 
   const {
     blockUser,
@@ -246,8 +248,50 @@ export default function ProfileScreen() {
       setPasswordModalVisible(true); // نطلب كلمة المرور قبل التعديل
     }
   };
+  const [rememberPassword, setRememberPassword] = useState(false);
+  const [savedPassword, setSavedPassword] = useState<string | null>(null);
+
+  // const handleConfirmPasswordAndSave = () => {
+  //   if (!enteredPassword) {
+  //     Alert.alert('خطأ', 'يرجى إدخال كلمة المرور');
+  //     return;
+  //   }
+
+  //   if (!currentEditKey) return;
+
+  //   if (currentEditKey === 'birthday') {
+  //     const y = dateValue.getFullYear();
+  //     const m = (dateValue.getMonth() + 1).toString().padStart(2, '0');
+  //     const d = dateValue.getDate().toString().padStart(2, '0');
+  //     const formattedDate = `${y}-${m}-${d}`;
+
+  //     setUserData((prev: any) => {
+  //       const updated = { ...prev, birthday: formattedDate };
+  //       updateSensitiveInfo(enteredPassword, { birthday: formattedDate });
+  //       return updated;
+  //     });
+  //   } else {
+  //     setUserData((prev: any) => {
+  //       const updated = { ...prev, [currentEditKey]: inputValue };
+
+  //       const sensitiveKeys = ['email', 'phone', 'password', 'gender', 'country', 'avatarUrl', 'coverUrl'];
+  //       if (sensitiveKeys.includes(currentEditKey)) {
+  //         updateSensitiveInfo(enteredPassword, { [currentEditKey]: inputValue });
+  //       }
+
+  //       return updated;
+  //     });
+  //   }
+
+  //   setPasswordModalVisible(false);
+  //   setModalVisible(false);
+  //   setEnteredPassword('');
+  // };
+
   const handleConfirmPasswordAndSave = () => {
-    if (!enteredPassword) {
+    const passwordToUse = enteredPassword || savedPassword;
+
+    if (!passwordToUse) {
       Alert.alert('خطأ', 'يرجى إدخال كلمة المرور');
       return;
     }
@@ -262,26 +306,176 @@ export default function ProfileScreen() {
 
       setUserData((prev: any) => {
         const updated = { ...prev, birthday: formattedDate };
-        updateSensitiveInfo(enteredPassword, { birthday: formattedDate });
+        updateSensitiveInfo(passwordToUse, { birthday: formattedDate });
         return updated;
       });
     } else {
       setUserData((prev: any) => {
         const updated = { ...prev, [currentEditKey]: inputValue };
 
-        const sensitiveKeys = ['email', 'phone', 'password', 'gender', 'country'];
+        const sensitiveKeys = ['email', 'phone', 'password', 'gender', 'country', 'avatarUrl', 'coverUrl'];
         if (sensitiveKeys.includes(currentEditKey)) {
-          updateSensitiveInfo(enteredPassword, { [currentEditKey]: inputValue });
+          updateSensitiveInfo(passwordToUse, { [currentEditKey]: inputValue });
         }
 
         return updated;
       });
     }
 
+    if (rememberPassword && enteredPassword) {
+      setSavedPassword(enteredPassword); // احفظ الكلمة
+    }
+
     setPasswordModalVisible(false);
     setModalVisible(false);
     setEnteredPassword('');
   };
+
+  const [pendingImageUri, setPendingImageUri] = useState<string | null>(null);
+  const [pendingKey, setPendingKey] = useState<'avatarUrl' | 'coverUrl' | null>(null);
+
+
+  const uploadFile = async (uri: string, type: 'image' | 'sound'): Promise<string | null> => {
+    if (!uri || typeof uri !== 'string') {
+      console.error('URI غير صالح أو غير موجود:', uri);
+      return null;
+    }
+
+    try {
+      const fileExt = uri.split('.').pop() || (type === 'sound' ? 'm4a' : 'jpg');
+      const mimeType = type === 'image' ? `image/${fileExt}` : `audio/${fileExt}`;
+
+      const formData = new FormData();
+      formData.append('file', {
+        uri,
+        name: `upload.${fileExt}`,
+        type: mimeType,
+      } as any);
+
+      const response = await axios.post(`${API_URL}/api/upload`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      if (response.status === 200 && response.data?.url) {
+        return response.data.url;
+      } else {
+        console.error('فشل رفع الملف:', response.data);
+        return null;
+      }
+    } catch (error) {
+      console.error('خطأ أثناء رفع الملف:', error);
+      return null;
+    }
+  };
+
+  const handleEditAvatarPress = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        ToastAndroid.show('يجب منح صلاحية الوصول للصور', ToastAndroid.SHORT);
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.7,
+      });
+
+      if (!result.canceled && result.assets.length > 0) {
+        const uri = result.assets[0].uri;
+        if (typeof uri === 'string') {
+          await editAvatar(uri);
+        } else {
+          console.warn('URI الناتج ليس نصاً:', uri);
+          ToastAndroid.show('فشل في اختيار الصورة', ToastAndroid.SHORT);
+        }
+      }
+    } catch (error) {
+      console.error('خطأ أثناء اختيار الصورة:', error);
+      ToastAndroid.show('حدث خطأ أثناء اختيار الصورة', ToastAndroid.SHORT);
+    }
+  };
+
+
+
+  const handleEditCoverPress = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        ToastAndroid.show('يجب منح صلاحية الوصول للصور', ToastAndroid.SHORT);
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.7,
+      });
+
+      if (!result.canceled && result.assets.length > 0) {
+        const uri = result.assets[0].uri;
+        if (typeof uri === 'string') {
+          await editCover(uri);
+        } else {
+          console.warn('URI الناتج ليس نصاً:', uri);
+          ToastAndroid.show('فشل في اختيار الصورة', ToastAndroid.SHORT);
+        }
+      }
+    } catch (error) {
+      console.error('خطأ أثناء اختيار صورة الغلاف:', error);
+      ToastAndroid.show('حدث خطأ أثناء اختيار صورة الغلاف', ToastAndroid.SHORT);
+    }
+  };
+
+
+  const editCover = async (uri: string) => {
+    if (!enteredPassword) {
+      setPendingImageUri(uri);
+      setPendingKey('coverUrl');
+      setPasswordModalVisible(true);
+      return;
+    }
+
+    try {
+      ToastAndroid.show('📤 جاري رفع صورة الغلاف...', ToastAndroid.SHORT);
+      const uploadedUrl = await uploadFile(uri, 'image');
+      if (!uploadedUrl) throw new Error('فشل رفع صورة الغلاف');
+
+      updateSensitiveInfo(enteredPassword, { coverUrl: uploadedUrl });
+      pickImage('coverUrl');
+
+      ToastAndroid.show('✅ تم تحديث صورة الغلاف بنجاح', ToastAndroid.SHORT);
+    } catch (error) {
+      console.error('❌ خطأ في تعديل صورة الغلاف:', error);
+      ToastAndroid.show('فشل في تحديث صورة الغلاف', ToastAndroid.SHORT);
+    }
+  };
+
+
+  const editAvatar = async (uri: string) => {
+    if (!enteredPassword) {
+      setPendingImageUri(uri);
+      setPendingKey('avatarUrl');
+      setPasswordModalVisible(true);
+      return;
+    }
+
+    try {
+      ToastAndroid.show('📤 جاري رفع الصورة الشخصية...', ToastAndroid.SHORT);
+      const uploadedUrl = await uploadFile(uri, 'image');
+      if (!uploadedUrl) throw new Error('فشل رفع الصورة');
+
+      updateSensitiveInfo(enteredPassword, { avatarUrl: uploadedUrl });
+      pickImage('avatarUrl');
+
+      ToastAndroid.show('✅ تم تحديث الصورة الشخصية بنجاح', ToastAndroid.SHORT);
+    } catch (error) {
+      console.error('❌ خطأ في تعديل الصورة الشخصية:', error);
+      ToastAndroid.show('فشل في تحديث الصورة الشخصية', ToastAndroid.SHORT);
+    }
+  };
+
 
 
 
@@ -298,11 +492,11 @@ export default function ProfileScreen() {
       <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={{ position: 'relative' }}>
-          <Image source={{ uri: userData.cover || "https://i.pinimg.com/736x/17/1a/6c/171a6c7b6bce25e1664c0d7315251e46.jpg" }} style={styles.coverImage} />
+          <Image source={{ uri: userData.coverUrl || "https://i.pinimg.com/736x/17/1a/6c/171a6c7b6bce25e1664c0d7315251e46.jpg" }} style={styles.coverImage} />
           {/* زر تعديل صورة الكوفر */}
           <TouchableOpacity
             style={styles.editCoverButton}
-            onPress={editCover}
+            onPress={handleEditCoverPress}
             activeOpacity={0.7}
           >
             <Ionicons name="create-outline" size={24} color="#FFF" />
@@ -320,11 +514,11 @@ export default function ProfileScreen() {
 
         <View style={styles.profileSection}>
           <View style={{ position: 'relative' }}>
-            <Image source={{ uri: userData.avatar || "https://i.pravatar.cc/150?img=12" }} style={styles.avatar} />
+            <Image source={{ uri: userData.avatarUrl || "https://i.pravatar.cc/150?img=12" }} style={styles.avatar} />
             {/* زر تعديل صورة الأفاتار */}
             <TouchableOpacity
               style={styles.editAvatarButton}
-              onPress={editAvatar}
+              onPress={handleEditAvatarPress}
               activeOpacity={0.7}
             >
               <Ionicons name="create-outline" size={20} color="#FFF" />
@@ -380,8 +574,8 @@ export default function ProfileScreen() {
             onCopy={handleCopy}
             onEdit={() => openEditModal('country', userData.country)}
           />
-     
-   
+
+
           <InfoItem
             icon="mail-outline"
             label="Email"
@@ -530,6 +724,7 @@ export default function ProfileScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContainer, { backgroundColor: theme.card }]}>
             <Text style={[styles.modalTitle, { color: theme.text }]}>تأكيد كلمة المرور</Text>
+
             <TextInput
               placeholder="أدخل كلمة المرور"
               secureTextEntry
@@ -538,17 +733,42 @@ export default function ProfileScreen() {
               onChangeText={setEnteredPassword}
               style={[styles.input, { color: theme.text, borderColor: theme.border }]}
             />
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 10 }}>
+              <Switch
+                value={rememberPassword}
+                onValueChange={setRememberPassword}
+                thumbColor={rememberPassword ? '#2196F3' : '#ccc'}
+              />
+              <Text style={{ marginLeft: 8, color: theme.text }}>تذكرني</Text>
+            </View>
+
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <TouchableOpacity onPress={() => setPasswordModalVisible(false)} style={styles.modalButton}>
                 <Text style={{ color: 'red' }}>إلغاء</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleConfirmPasswordAndSave} style={styles.modalButton}>
+
+              <TouchableOpacity
+                onPress={() => {
+                  setPasswordModalVisible(false);
+
+                  if (pendingImageUri && pendingKey === 'avatarUrl') {
+                    editAvatar(pendingImageUri);
+                  } else if (pendingImageUri && pendingKey === 'coverUrl') {
+                    editCover(pendingImageUri);
+                  }
+
+                  handleConfirmPasswordAndSave();
+                }}
+                style={styles.modalButton}
+              >
                 <Text style={{ color: 'green' }}>تأكيد</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
+
 
     </SafeAreaView>
   );

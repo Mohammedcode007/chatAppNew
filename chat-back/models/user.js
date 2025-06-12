@@ -31,6 +31,8 @@ const userSchema = new mongoose.Schema({
   age: { type: Number, default: 18 },
   birthday: { type: Date, default: () => new Date('2000-01-01') },
   verified: { type: Boolean, default: false },  // حالة التحقق
+avatarUrl: { type: String, default: '' },  // رابط الصورة الشخصية
+coverUrl: { type: String, default: '' },   // رابط صورة الغلاف
 
   country: { type: String, default: 'Unknown' },
   views: { type: Number, default: 0 },

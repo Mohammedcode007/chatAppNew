@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const mediaExtensions = {
   image: /\.(jpg|jpeg|png|gif|webp)$/i,
   video: /\.(mp4|mov|avi|mkv|webm)$/i,
-  sound: /\.(mp3|wav|ogg|aac)$/i,
+  audio: /\.(mp3|wav|ogg|aac)$/i,
   gif: /\.(gif)$/i
 };
 
@@ -22,7 +22,7 @@ const groupMessageSchema = new mongoose.Schema({
   },
   messageType: {
     type: String,
-    enum: ['text', 'image', 'sound', 'video', 'gif'],
+    enum: ['text', 'image', 'audio', 'video', 'gif'],
     default: 'text',
     required: true
   },
@@ -44,7 +44,7 @@ const groupMessageSchema = new mongoose.Schema({
             return typeof value === 'string' && value.trim().length > 0;
           case 'image':
           case 'video':
-          case 'sound':
+          case 'audio':
           case 'gif':
             return (
               urlRegex.test(value) &&

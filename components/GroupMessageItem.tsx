@@ -8,6 +8,8 @@ import {
   Alert,
   TouchableOpacity,
   ScrollView,
+  Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { Text } from '@/components/Themed';
 import { useThemeMode } from '@/context/ThemeContext';
@@ -16,15 +18,21 @@ import CustomBottomSheet from './CustomBottomSheet';
 import { useSendToAllGroups } from '@/Hooks/useSendToAllGroups';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-
+import AnimatedGifOverlay from './AnimatedGifOverlay';
+import AudioMessage from './AudioMessage';
+import ImageMessage from './ImageMessage';
+const isUrl = (text: string) => {
+  const urlRegex = /^(https?:\/\/[^\s]+)$/i;
+  return urlRegex.test(text.trim());
+};
 export type Message = {
   _id: string;
-  type: 'text' | 'image' | 'audio';
+  type: 'text' | 'image' | 'audio' | 'gif';
   text: string;
   sender: {
     _id: string;
     username: string;
-    avatar?: string;
+    avatarUrl?: string;
     badge?: string;
   };
   timestamp: number;
@@ -40,12 +48,28 @@ interface Props {
 const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 
 const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
+  console.log(item, '78765456');
+
   const { darkMode } = useThemeMode();
   const isMyMessage = item?.sender?._id === currentUserId;
-  const avatar = item?.sender?.avatar || DEFAULT_AVATAR;
+  const avatarUrl = item?.sender?.avatarUrl || DEFAULT_AVATAR;
   const isSystemMessage = item.senderType === 'system';
   const [userData, setUserData] = useState<any>(null);
+  const isGif = item.type === 'gif';
+  const [internalModalVisible, setInternalModalVisible] = useState(false);
+  const duration = 16000;
 
+  useEffect(() => {
+    if (isGif) {
+      setInternalModalVisible(true);
+
+      const timer = setTimeout(() => {
+        setInternalModalVisible(false);
+      }, duration);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isGif]);
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -97,6 +121,9 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
     setGiftVisible(true);
   };
 
+  const handleClose = () => {
+    setInternalModalVisible(false);
+  };
 
   return (
     <View
@@ -105,19 +132,75 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
         { flexDirection: isMyMessage ? 'row-reverse' : 'row' },
       ]}
     >
-      {!isMyMessage && !isSystemMessage && (
+      {!isSystemMessage && (
         <TouchableOpacity onPress={() => setOptionsVisible(true)}>
 
           <Image
-            source={{ uri: avatar }}
-            style={[styles.avatar, { borderColor: colors.avatarBorder }]}
+            source={{ uri: avatarUrl }}
+            style={[
+              styles.avatar,
+              {
+                borderColor: colors.avatarBorder,
+                marginRight: !isMyMessage ? 8 : undefined,
+                marginLeft: isMyMessage ? 10 : undefined
+              }
+            ]}
             resizeMode="cover"
           />
         </TouchableOpacity>
 
       )}
-      {isSystemMessage ? (<View style={{ alignItems: 'center', marginVertical: 6, flex: 1, justifyContent: "center" }}>
-        <Text style={{ color: 'red', fontSize: 10 }}>{item.text}</Text>
+      {isSystemMessage ? (<View
+        style={[
+          {
+            alignItems: 'center',
+            marginVertical: 6,
+            justifyContent: 'center',
+
+          },
+          isGif
+            ? {
+              position: "absolute",
+              width: '100%',
+              height: "100%",
+
+              pointerEvents: 'none', // لو عايزها تمرر التاتشات تحتها
+
+            }
+            : { flex: 1 }
+        ]}
+      >
+        {!isUrl(item.text) && (
+          <Text style={{ color: 'red', fontSize: 10 }}>{item.text}</Text>
+        )}
+
+        {internalModalVisible && (
+          <Modal transparent animationType="fade" visible={true}>
+            <TouchableWithoutFeedback onPress={handleClose}>
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: 'transperant',
+                  zIndex: 9999,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+                pointerEvents="auto" // لتمكين الضغط
+              >
+                <AnimatedGifOverlay
+                  gifUrl="https://i.postimg.cc/Jn2RPjqz/Phoenix.gif"
+                  soundPath={require('../assets/sound/phoenixsound.mp3')}
+                  duration={duration}
+                />
+              </View>
+            </TouchableWithoutFeedback>
+          </Modal>
+        )}
+
       </View>) : (<View style={styles.messageWrapper}>
         {/* ذيل الرسالة */}
         <View
@@ -147,7 +230,6 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
             },
           ]}
         >
-          {/* اسم المرسل يظهر فقط للرسائل الغير خاصة بي */}
           {item.sender && (
             <View
               style={{
@@ -155,7 +237,7 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
                 paddingHorizontal: 6,
                 paddingVertical: 2,
                 borderRadius: 8,
-                alignSelf: 'flex-start',
+                alignSelf: isMyMessage ? 'flex-end' : 'flex-start',
                 marginBottom: 4,
               }}
             >
@@ -177,6 +259,8 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
                   color: isMyMessage
                     ? colors.myMessageText
                     : colors.otherMessageText,
+                  alignSelf: isMyMessage ? 'flex-end' : 'flex-start',
+
                 },
               ]}
             >
@@ -184,18 +268,12 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
             </Text>
           )}
 
-          {/* رسالة صورة */}
-          {item.type === 'image' && (
-            <Image
-              source={{ uri: item.text }}
-              style={styles.imageMessage}
-              resizeMode="cover"
-            />
-          )}
+          {item.type === 'image' && <ImageMessage uri={item.text} />}
 
-          {/* رسالة صوتية */}
+
           {item.type === 'audio' && (
-            <AudioMessagePlayer uri={item.text} isMyMessage={isMyMessage} />
+            <AudioMessage uri={item.text} />
+
           )}
         </View>
       </View>)}
@@ -286,7 +364,6 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    marginRight: 8,
     borderWidth: 2,
   },
   messageText: {

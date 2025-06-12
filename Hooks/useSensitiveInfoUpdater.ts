@@ -8,6 +8,8 @@ type SensitiveInfoUpdates = Partial<{
   age: number;
   birthday: string;
   country: string;
+    avatarUrl: string;
+  coverUrl: string;
 }>;
 
 export function useSensitiveInfoUpdater() {

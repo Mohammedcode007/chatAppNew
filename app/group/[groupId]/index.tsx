@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Alert,
 } from 'react-native';
 import { Text } from '@/components/Themed';
 import { useLocalSearchParams } from 'expo-router';
@@ -21,6 +22,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import MessageInput from '@/components/MessageInput';
 import GroupMessageItem from '@/components/GroupMessageItem';
 import DraggableFAB from '@/components/DraggableFAB';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import { Audio } from "expo-av";
+import axios from 'axios';
+import { API_URL } from '@/config';
 
 type Message = {
   _id: string; // معرف حقيقي أو وهمي يبدأ بـ "temp-"
@@ -39,14 +45,18 @@ type Message = {
 
 
 export default function GroupChatScreen() {
-  const { groupId, name, description,members } = useLocalSearchParams<{ groupId: string; name?: string, description?: string,members?: string }>();
+  const { groupId, name, description, members } = useLocalSearchParams<{ groupId: string; name?: string, description?: string, members?: string }>();
   const { darkMode } = useThemeMode();
   const [userData, setUserData] = useState<any>(null);
   const [senderType, setSenderType] = useState<'user' | 'system'>('user');
+  const insets = useSafeAreaInsets();
 
   const { messages, loading, error, sendMessage } = useGroupMessages(groupId, userData?._id || '');
   const [inputText, setInputText] = useState('');
   const flatListRef = useRef<FlatList>(null);
+  const scrollToEnd = () => {
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+  };
 
   const navigation = useNavigation();
 
@@ -136,7 +146,138 @@ export default function GroupChatScreen() {
     ...localMessages,
   ];
 
-  // عرض الرسائل مع التفريق بين رسائل المستخدم والآخرين
+
+
+  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [loading1, setLoading] = useState(false);
+
+  const pickAndUploadImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 1,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const uri = result.assets[0].uri;
+      setImageUri(uri);
+      await uploadImage(uri);
+    } else {
+      Alert.alert('إلغاء', 'لم يتم اختيار أي صورة');
+    }
+  };
+
+  const uploadImage = async (uri: string) => {
+    setLoading(true);
+
+    const uriParts = uri.split('.');
+    const fileType = uriParts[uriParts.length - 1];
+
+    const formData = new FormData();
+    formData.append('file', {
+      uri: uri,
+      name: `upload.${fileType}`,
+      type: `image/${fileType}`,
+    } as any); // لتفادي مشاكل التوافق في TypeScript
+
+    try {
+      const response = await axios.post(`${API_URL}/api/upload`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      await sendMessage(response.data.url, 'image', senderType);
+
+
+
+      scrollToEnd();
+    } catch (error) {
+      console.error(error);
+      Alert.alert('خطأ', 'حدث خطأ أثناء رفع الصورة');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+
+
+  const startRecording = async () => {
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert("صلاحية مطلوبة", "يجب منح صلاحية الميكروفون");
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      setRecording(recording);
+      setIsRecording(true);
+    } catch (error) {
+      console.error("فشل في بدء التسجيل:", error);
+      Alert.alert("خطأ", "تعذر بدء التسجيل");
+    }
+  };
+
+  const stopRecording = async () => {
+    try {
+      if (!recording) return;
+
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecording(null);
+      setIsRecording(false);
+
+      if (uri) {
+        await uploadFile(uri, "sound");
+      }
+    } catch (error) {
+      console.error("خطأ في إيقاف التسجيل:", error);
+      Alert.alert("خطأ", "تعذر إيقاف التسجيل");
+    }
+  };
+
+  const uploadFile = async (uri: string, type: "sound") => {
+    setLoading(true);
+
+    const uriParts = uri.split(".");
+    const fileType = uriParts[uriParts.length - 1] || (type === "sound" ? "m4a" : "jpg");
+
+    const formData = new FormData();
+    formData.append("file", {
+      uri,
+      name: `upload.${fileType}`,
+      type: `${type}/${fileType}`,
+    } as any);
+
+    try {
+      const response = await axios.post(`${API_URL}/api/upload`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      console.log(response.data.url, 'response.data.url');
+
+      await sendMessage(response.data.url, 'audio', senderType);
+
+
+
+      scrollToEnd();
+    } catch (error) {
+      console.error(`خطأ أثناء رفع ${type}:`, error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderMessage = ({ item }: { item: Message | { _id: string, type: string } }) => {
     if (item.type === 'header') {
       if (description !== "") {
@@ -175,16 +316,31 @@ export default function GroupChatScreen() {
         keyExtractor={(item) => item._id}
         renderItem={renderMessage}
         contentContainerStyle={styles.messagesList}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+             onContentSizeChange={scrollToEnd}
+          onLayout={scrollToEnd}
+        // onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        // onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
       />
 
 
       <MessageInput
+
+
         inputText={inputText}
         onChangeText={setInputText}
         onSend={sendTextMessage}
         darkMode={darkMode}
+        pickAndUploadImage={pickAndUploadImage}
+        isRecording={isRecording}
+        startRecording={startRecording}
+        stopRecording={stopRecording}
+        insetsBottom={insets.bottom}
+
+
+      // inputText={inputText}
+      // onChangeText={setInputText}
+      // onSend={sendTextMessage}
+      // darkMode={darkMode}
       />
       {/** الزر العائم */}
       <DraggableFAB onSearchPress={() => console.log('فتح البحث')} messages={localMessages} />
