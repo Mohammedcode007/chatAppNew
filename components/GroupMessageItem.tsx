@@ -21,6 +21,7 @@ import { useRouter } from 'expo-router';
 import AnimatedGifOverlay from './AnimatedGifOverlay';
 import AudioMessage from './AudioMessage';
 import ImageMessage from './ImageMessage';
+import FloatingEmoji from './FloatingEmoji';
 const isUrl = (text: string) => {
   const urlRegex = /^(https?:\/\/[^\s]+)$/i;
   return urlRegex.test(text.trim());
@@ -48,28 +49,51 @@ interface Props {
 const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 
 const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
-  console.log(item, '78765456');
 
   const { darkMode } = useThemeMode();
   const isMyMessage = item?.sender?._id === currentUserId;
   const avatarUrl = item?.sender?.avatarUrl || DEFAULT_AVATAR;
   const isSystemMessage = item.senderType === 'system';
   const [userData, setUserData] = useState<any>(null);
-  const isGif = item.type === 'gif';
-  const [internalModalVisible, setInternalModalVisible] = useState(false);
-  const duration = 16000;
+  const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null);
 
+  const isGif = item.type === 'gif';
+
+  const [internalModalVisible, setInternalModalVisible] = useState(false);
+
+  const duration = 16000;
   useEffect(() => {
     if (isGif) {
-      setInternalModalVisible(true);
+      const now = Date.now();
+      const messageAge = now - item.timestamp;
+      console.log(messageAge);
 
-      const timer = setTimeout(() => {
+      if (messageAge <= 5000) {
+        setInternalModalVisible(true);
+
+        const timer = setTimeout(() => {
+          setInternalModalVisible(false);
+        }, duration);
+
+        return () => clearTimeout(timer);
+      } else {
+        // الرسالة قديمة جدًا، لا نظهر الـ GIF
         setInternalModalVisible(false);
-      }, duration);
-
-      return () => clearTimeout(timer);
+      }
     }
-  }, [isGif]);
+  }, [isGif, item, selectedEmoji]);
+
+  // useEffect(() => {
+  //   if (isGif) {
+  //     setInternalModalVisible(true);
+
+  //     const timer = setTimeout(() => {
+  //       setInternalModalVisible(false);
+  //     }, duration);
+
+  //     return () => clearTimeout(timer);
+  //   }
+  // }, [isGif]);
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -125,6 +149,10 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
     setInternalModalVisible(false);
   };
 
+  console.log(selectedEmoji, 'selectedEmoji');
+
+
+
   return (
     <View
       style={[
@@ -158,7 +186,7 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
             justifyContent: 'center',
 
           },
-          isGif
+          isGif && internalModalVisible
             ? {
               position: "absolute",
               width: '100%',
@@ -174,7 +202,8 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
           <Text style={{ color: 'red', fontSize: 10 }}>{item.text}</Text>
         )}
 
-        {internalModalVisible && (
+
+        {isSystemMessage && isGif && internalModalVisible && (
           <Modal transparent animationType="fade" visible={true}>
             <TouchableWithoutFeedback onPress={handleClose}>
               <View
@@ -184,22 +213,27 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
                   left: 0,
                   width: '100%',
                   height: '100%',
-                  backgroundColor: 'transperant',
+                  backgroundColor: 'transparent',
                   zIndex: 9999,
                   justifyContent: 'center',
                   alignItems: 'center',
                 }}
-                pointerEvents="auto" // لتمكين الضغط
+                pointerEvents="auto"
               >
-                <AnimatedGifOverlay
+                {/* <AnimatedGifOverlay
                   gifUrl="https://i.postimg.cc/Jn2RPjqz/Phoenix.gif"
                   soundPath={require('../assets/sound/phoenixsound.mp3')}
                   duration={duration}
-                />
+                /> */}
+                {item.text.match(/\p{Emoji}/u) && (
+                  <FloatingEmoji emoji={item.text.match(/\p{Emoji}/u)![0]} />
+                )}
+
               </View>
             </TouchableWithoutFeedback>
           </Modal>
         )}
+
 
       </View>) : (<View style={styles.messageWrapper}>
         {/* ذيل الرسالة */}
@@ -251,7 +285,7 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
           )}
 
           {/* رسالة نصية */}
-          {item.type === 'text' && (
+          {(item.type === 'text' || item.type === 'gif') && (
             <Text
               style={[
                 styles.messageText,
@@ -300,25 +334,30 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
         onClose={() => setGiftVisible(false)}
       >
         <Text style={styles.giftTitle}>Select a Gift:</Text>
-        <ScrollView horizontal contentContainerStyle={styles.giftScroll}>
-          {['🎉', '🌹', '🍫', '💎', '🎂'].map((emoji, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.emojiWrapper}
-              onPress={() => {
-                sendToAllGroups(
-                  `${item?.sender?.username} received a ${emoji} gift from ${userData?.username} !`,
-                  'text',
-                  'system'
-                );
+        <ScrollView  contentContainerStyle={styles.giftScroll}>
+          {['🎉', '🌹', '🍫', '💎', '🎂',
+            '🔥', '✨', '🎁', '😻', '👑',
+            '🎈', '🧸', '💖', '😇', '💐',
+            '🍰', '🪅', '🥇', '🏆', '🎶',].map((emoji, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.emojiWrapper}
+                onPress={() => {
+                  // handleEmojiPress(emoji)
+                  setSelectedEmoji(emoji)
+                  sendToAllGroups(
+                    `${item?.sender?.username} received a ${emoji} gift from ${userData?.username} !`,
+                    'gif',
+                    'system'
+                  );
 
 
-                setGiftVisible(false);
-              }}
-            >
-              <Text style={styles.emoji}>{emoji}</Text>
-            </TouchableOpacity>
-          ))}
+                  setGiftVisible(false);
+                }}
+              >
+                <Text style={styles.emoji}>{emoji}</Text>
+              </TouchableOpacity>
+            ))}
         </ScrollView>
       </CustomBottomSheet>
     </View>
@@ -425,12 +464,18 @@ const styles = StyleSheet.create({
   giftScroll: {
     paddingHorizontal: 10,
     paddingBottom: 10,
+      flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
   emojiWrapper: {
     backgroundColor: '#f0f0f0',
     padding: 10,
     borderRadius: 12,
     marginHorizontal: 8,
+        marginVertical: 6,
+
+  
   },
   emoji: {
     fontSize: 32,

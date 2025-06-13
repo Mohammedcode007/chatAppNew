@@ -18,6 +18,7 @@ import i18n from '@/i18n';
 import { useRouter } from 'expo-router';
 import { useAllConversations } from '@/Hooks/useAllConversations';
 import { useFocusEffect } from '@react-navigation/native';
+import { useUserFetcherById } from '@/Hooks/useUserFetcherById';
 
 function formatTime(dateTimeStr: string, locale = 'en-US') {
   const date = new Date(dateTimeStr);
@@ -62,6 +63,34 @@ export default function ChatsScreen() {
   const filteredConversations = conversations.filter((conv) =>
     conv.withUsername.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+    const [userData, setUserData] = useState<any>(null);
+  console.log(userData, 'userData');
+  const { userData: userDataNew } = useUserFetcherById(userData?._id);
+  console.log(userDataNew, 'userDataNew');
+
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const userDataString = await AsyncStorage.getItem('userData');
+        if (userDataString) {
+          const userData = JSON.parse(userDataString);
+          setUserData(userData);
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+useEffect(() => {
+  if (userDataNew && userDataNew._id) {
+    setUserData(userDataNew); // تحديث دائمًا إذا كانت البيانات الجديدة موجودة
+    AsyncStorage.setItem('userData', JSON.stringify(userDataNew)); // حفظ في التخزين المحلي
+  }
+}, [userDataNew]);
 
 
   if (loading) {

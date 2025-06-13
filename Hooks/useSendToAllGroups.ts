@@ -3,7 +3,7 @@ import { useWebSocket } from '@/context/WebSocketContext';
 interface SendToAllGroupsPayload {
   type: 'send_message_to_all_groups';
   newMessage: string;
-  messageType?: 'text' | 'image' | 'audio';
+  messageType?: 'text' | 'image' | 'audio' | 'gif';
   tempId?: string;
   senderType?: 'user' | 'system';
 }
@@ -13,7 +13,7 @@ export function useSendToAllGroups(currentUserId: string) {
 
   const sendToAllGroups = (
     newMessageText: string,
-    messageType: 'text' | 'image' | 'audio' = 'text',
+    messageType: 'text' | 'image' | 'audio'| 'gif' = 'text',
     senderType: 'user' | 'system' = 'user'
   ) => {
     if (ws.current?.readyState !== WebSocket.OPEN) return;

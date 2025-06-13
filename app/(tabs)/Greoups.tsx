@@ -34,7 +34,6 @@ export default function GroupChatsScreen() {
   const router = useRouter();
   const [selectedTab, setSelectedTab] = useState<'favorite' | 'active' | 'popular'>('active');
   const [userData, setUserData] = useState<any>(null);
-  const hasEnteredRoom = useRef(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -193,6 +192,23 @@ console.log(pendingJoinGroup,"pendingJoinGroup");
 const renderItem = ({ item }: { item: any }) => {
   const displayAvatars = (item.members || []).slice(0, 2);
   const remaining = (item.members?.length || 0) - displayAvatars.length;
+ const generateColorFromName = (name: string) => {
+    const colors = ['#E57373', '#64B5F6', '#81C784', '#FFD54F', '#BA68C8', '#4DD0E1', '#F06292'];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash % colors.length);
+    return colors[index];
+  };
+
+  const initials = item.name
+    ? item.name
+        .split(' ')
+        .slice(0, 2)
+        .map((word: string) => word.charAt(0).toUpperCase())
+        .join('')
+    : '??';
 
   return (
     <TouchableOpacity
@@ -211,17 +227,20 @@ const renderItem = ({ item }: { item: any }) => {
       }}
     >
       {/* صورة أول عضو فقط */}
-      <Image
-        source={{ uri: displayAvatars[0]?.avatar || 'https://via.placeholder.com/50' }}
+     <View
         style={{
           width: 42,
           height: 42,
           borderRadius: 21,
+          backgroundColor: generateColorFromName(item.name),
+          justifyContent: 'center',
+          alignItems: 'center',
           marginRight: isRTL ? 0 : 12,
           marginLeft: isRTL ? 12 : 0,
         }}
-      />
-
+      >
+        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>{initials}</Text>
+      </View>
       {/* محتوى المجموعة */}
       <View style={{ flex: 1 }}>
         {/* اسم المجموعة + الأيقونات */}

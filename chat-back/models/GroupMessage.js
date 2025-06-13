@@ -36,16 +36,18 @@ const groupMessageSchema = new mongoose.Schema({
     type: String,
     required: true,
     validate: {
-      validator: function(value) {
+      validator: function (value) {
         const urlRegex = /^(https?:\/\/[^\s]+)$/i;
 
         switch (this.messageType) {
           case 'text':
+          case 'gif':
+
             return typeof value === 'string' && value.trim().length > 0;
           case 'image':
           case 'video':
           case 'audio':
-          case 'gif':
+            // case 'gif':
             return (
               urlRegex.test(value) &&
               mediaExtensions[this.messageType].test(value)
@@ -54,7 +56,7 @@ const groupMessageSchema = new mongoose.Schema({
             return false;
         }
       },
-      message: function() {
+      message: function () {
         return `Invalid 'text' value for messageType '${this.messageType}'. It must be a valid ${this.messageType} URL.`;
       }
     }

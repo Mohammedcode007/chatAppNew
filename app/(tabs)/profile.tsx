@@ -138,7 +138,6 @@ export default function ProfileScreen() {
 
   const handleCopy = (value: string) => {
     Clipboard.setStringAsync(value);
-    Alert.alert('Copied', 'تم نسخ القيمة إلى الحافظة');
   };
 
   const pickImage = async (type: 'avatarUrl' | 'coverUrl') => {
@@ -171,13 +170,7 @@ export default function ProfileScreen() {
     }
   };
 
-  // const editAvatar = () => {
-  //   pickImage('avatarUrl');
-  // };
 
-  // const editCover = () => {
-  //   pickImage('coverUrl');
-  // };
 
   const {
     blockUser,
@@ -251,42 +244,6 @@ export default function ProfileScreen() {
   const [rememberPassword, setRememberPassword] = useState(false);
   const [savedPassword, setSavedPassword] = useState<string | null>(null);
 
-  // const handleConfirmPasswordAndSave = () => {
-  //   if (!enteredPassword) {
-  //     Alert.alert('خطأ', 'يرجى إدخال كلمة المرور');
-  //     return;
-  //   }
-
-  //   if (!currentEditKey) return;
-
-  //   if (currentEditKey === 'birthday') {
-  //     const y = dateValue.getFullYear();
-  //     const m = (dateValue.getMonth() + 1).toString().padStart(2, '0');
-  //     const d = dateValue.getDate().toString().padStart(2, '0');
-  //     const formattedDate = `${y}-${m}-${d}`;
-
-  //     setUserData((prev: any) => {
-  //       const updated = { ...prev, birthday: formattedDate };
-  //       updateSensitiveInfo(enteredPassword, { birthday: formattedDate });
-  //       return updated;
-  //     });
-  //   } else {
-  //     setUserData((prev: any) => {
-  //       const updated = { ...prev, [currentEditKey]: inputValue };
-
-  //       const sensitiveKeys = ['email', 'phone', 'password', 'gender', 'country', 'avatarUrl', 'coverUrl'];
-  //       if (sensitiveKeys.includes(currentEditKey)) {
-  //         updateSensitiveInfo(enteredPassword, { [currentEditKey]: inputValue });
-  //       }
-
-  //       return updated;
-  //     });
-  //   }
-
-  //   setPasswordModalVisible(false);
-  //   setModalVisible(false);
-  //   setEnteredPassword('');
-  // };
 
   const handleConfirmPasswordAndSave = () => {
     const passwordToUse = enteredPassword || savedPassword;
@@ -492,7 +449,7 @@ export default function ProfileScreen() {
       <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={{ position: 'relative' }}>
-          <Image source={{ uri: userData.coverUrl || "https://i.pinimg.com/736x/17/1a/6c/171a6c7b6bce25e1664c0d7315251e46.jpg" }} style={styles.coverImage} />
+          <Image source={{ uri: userData?.coverUrl || "https://i.pinimg.com/736x/17/1a/6c/171a6c7b6bce25e1664c0d7315251e46.jpg" }} style={styles.coverImage} />
           {/* زر تعديل صورة الكوفر */}
           <TouchableOpacity
             style={styles.editCoverButton}
@@ -514,7 +471,7 @@ export default function ProfileScreen() {
 
         <View style={styles.profileSection}>
           <View style={{ position: 'relative' }}>
-            <Image source={{ uri: userData.avatarUrl || "https://i.pravatar.cc/150?img=12" }} style={styles.avatar} />
+            <Image source={{ uri: userData?.avatarUrl || "https://i.pravatar.cc/150?img=12" }} style={styles.avatar} />
             {/* زر تعديل صورة الأفاتار */}
             <TouchableOpacity
               style={styles.editAvatarButton}
@@ -603,7 +560,7 @@ export default function ProfileScreen() {
           <InfoItem
             icon="calendar-outline"
             label="Birthday"
-            value={userData.birthday}
+            value={new Date(userData.birthday).toLocaleDateString()}
             theme={theme}
             onCopy={handleCopy}
             onEdit={() => openEditModal('birthday', userData.birthday)}
@@ -720,8 +677,8 @@ export default function ProfileScreen() {
           theme={theme} />
 
       </ScrollView>
-      <Modal visible={passwordModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
+      <Modal visible={passwordModalVisible} animationType="slide" transparent >
+        <View style={styles.modalOverlay} >
           <View style={[styles.modalContainer, { backgroundColor: theme.card }]}>
             <Text style={[styles.modalTitle, { color: theme.text }]}>تأكيد كلمة المرور</Text>
 
@@ -852,7 +809,7 @@ const styles = StyleSheet.create({
   },
   editCoverButton: {
     position: 'absolute',
-    top: 10,
+    bottom: 10,
     right: 10,
     backgroundColor: 'rgba(238,9,121,0.8)',
     borderRadius: 20,
@@ -926,6 +883,7 @@ const styles = StyleSheet.create({
   modalContainer: {
     borderRadius: 10,
     padding: 15,
+    width: "90%"
   },
   modalTitle: {
     fontSize: 18,
@@ -955,6 +913,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+
+
   },
 
   modalContent: {

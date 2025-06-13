@@ -81,6 +81,8 @@ export default function RootLayout() {
     }
   };
 
+
+
   if (!fontsLoaded || !languageLoaded || darkMode === null) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -161,7 +163,7 @@ export default function RootLayout() {
                       animation: 'slide_from_right',
                     }}
                   />
-                    <Stack.Screen
+                  <Stack.Screen
                     name="/UserProfile"
                     options={{
                       headerShown: true,
@@ -184,7 +186,7 @@ export default function RootLayout() {
                       animation: 'slide_from_right',
                     }}
                   />
-                
+
 
 
                   <Stack.Screen
