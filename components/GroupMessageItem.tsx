@@ -11,6 +11,8 @@ import {
   Modal,
   TouchableWithoutFeedback,
 } from 'react-native';
+import emojiRegex from 'emoji-regex';
+
 import { Text } from '@/components/Themed';
 import { useThemeMode } from '@/context/ThemeContext';
 import AudioMessagePlayer from '@/components/AudioMessagePlayer';
@@ -149,9 +151,11 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
     setInternalModalVisible(false);
   };
 
-  console.log(selectedEmoji, 'selectedEmoji');
+  console.log(item, 'selectedEmoji');
 
-
+const regex = emojiRegex();
+const match = item.text.match(regex);
+const emoji = match ? match[0] : null;
 
   return (
     <View
@@ -225,9 +229,8 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
                   soundPath={require('../assets/sound/phoenixsound.mp3')}
                   duration={duration}
                 /> */}
-                {item.text.match(/\p{Emoji}/u) && (
-                  <FloatingEmoji emoji={item.text.match(/\p{Emoji}/u)![0]} />
-                )}
+              {emoji && <FloatingEmoji emoji={emoji} />}
+
 
               </View>
             </TouchableWithoutFeedback>
@@ -335,7 +338,7 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
       >
         <Text style={styles.giftTitle}>Select a Gift:</Text>
         <ScrollView  contentContainerStyle={styles.giftScroll}>
-          {['🎉', '🌹', '🍫', '💎', '🎂',
+          {['🥰', '🌹', '🍫', '💎', '🎂',
             '🔥', '✨', '🎁', '😻', '👑',
             '🎈', '🧸', '💖', '😇', '💐',
             '🍰', '🪅', '🥇', '🏆', '🎶',].map((emoji, index) => (

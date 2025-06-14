@@ -161,7 +161,7 @@ export default function UserProfileScreen() {
                     <InfoItem
                         icon="calendar-outline"
                         label="Birthday"
-                        value={userData.birthday}
+                        value={new Date(userData.birthday).toLocaleDateString()}
                         theme={theme}
                         onCopy={handleCopy}
                         onEdit={function (): void {
