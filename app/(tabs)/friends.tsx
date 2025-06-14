@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, FlatList, StyleSheet, SafeAreaView, Image, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, StyleSheet, SafeAreaView, Image, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/store';
 import CustomHeader from '@/components/CustomHeader';
@@ -9,6 +9,9 @@ import { useThemeMode } from '@/context/ThemeContext';
 import { useFriendStatuses } from '@/Hooks/useFriendStatuses';
 import { useRouter } from 'expo-router';
 import { useAllFriends } from '@/Hooks/useAllFriends';
+import { Ionicons } from '@expo/vector-icons';
+import { useDeleteFriend } from '@/Hooks/useDeleteFriend';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Friend = {
   _id: string;
@@ -66,35 +69,145 @@ export default function Friends() {
     });
   };
 
+  // const renderFriend = ({ item }: { item: Friend }) => (
+  //   <TouchableOpacity style={[styles.friendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+  //     onPress={() => router.push(`/chat/${item._id}?name=${encodeURIComponent(item.username)}&status=${item.status}`
+  //     )}
+  //   >
+  //     <View style={styles.avatarContainer}>
+  //       <Image source={{ uri: item.avatarUrl && item.avatarUrl.trim() !== '' ? item.avatarUrl : 'https://static.vecteezy.com/system/resources/previews/024/183/525/non_2x/avatar-of-a-man-portrait-of-a-young-guy-illustration-of-male-character-in-modern-color-style-vector.jpg' }}
+  //         style={styles.avatar} />
+  //       <View
+  //         style={[
+  //           styles.onlineIndicator,
+  //           { backgroundColor: item.status === "online" ? 'green' : 'gray' },
+  //         ]}
+  //       />
+  //     </View>
+  //     <View
+  //       style={[
+  //         styles.infoContainer,
+  //         {
+  //           marginLeft: isRTL ? 0 : 15,
+  //           marginRight: isRTL ? 15 : 0,
+  //           alignItems: isRTL ? 'flex-end' : 'flex-start',
+  //         },
+  //       ]}
+  //     >
+  //       <Text style={[styles.friendName, { color: darkMode ? '#fff' : '#000' }]}>{item.username}</Text>
+  //       <Text style={[styles.statusMessage, { color: darkMode ? '#aaa' : '#666' }]}>{item.status === "online" ? "Online" : "Offline"}</Text>
+  //     </View>
+  //   </TouchableOpacity>
+  // );
+
+  const [token, setToken] = useState<string | null>(null);
+
+
+  useEffect(() => {
+    const fetchToken = async () => {
+      try {
+        const storedToken = await AsyncStorage.getItem('authToken');
+        if (storedToken) {
+          setToken(storedToken);
+        }
+      } catch (error) {
+        console.error('Failed to get token:', error);
+      }
+    };
+    fetchToken();
+  }, []);
+  const { deleteFriend, loading:loadingDElet } = useDeleteFriend();
+
+  const handleDelete = (friendId: string, username: string) => {
+    if (!token) {
+      Alert.alert("خطأ", "رمز التوثيق غير متوفر");
+      return;
+    }
+    Alert.alert(
+      "تأكيد الحذف",
+      `هل أنت متأكد أنك تريد حذف ${username} من قائمة أصدقائك؟`,
+      [
+        { text: "إلغاء", style: "cancel" },
+        {
+          text: "حذف",
+          style: "destructive",
+          onPress: async () => {
+            const result = await deleteFriend(friendId, token); // تأكد من وجود authToken المناسب
+            if (result.success) {
+              // يمكنك هنا تحديث واجهة المستخدم يدويًا أو انتظار تحديث WebSocket
+            } else {
+              Alert.alert("خطأ", result.message);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const renderFriend = ({ item }: { item: Friend }) => (
-    <TouchableOpacity style={[styles.friendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-      onPress={() => router.push(`/chat/${item._id}?name=${encodeURIComponent(item.username)}&status=${item.status}`
-      )}
+    <View
+      style={[
+        styles.friendItem,
+        {
+          flexDirection: isRTL ? 'row-reverse' : 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        },
+      ]}
     >
-      <View style={styles.avatarContainer}>
-        <Image source={{ uri: item.avatarUrl && item.avatarUrl.trim() !== '' ? item.avatarUrl : 'https://static.vecteezy.com/system/resources/previews/024/183/525/non_2x/avatar-of-a-man-portrait-of-a-young-guy-illustration-of-male-character-in-modern-color-style-vector.jpg' }}
-          style={styles.avatar} />
+      <TouchableOpacity
+        style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flex: 1 }}
+        onPress={() =>
+          router.push(
+            `/chat/${item._id}?name=${encodeURIComponent(item.username)}&status=${item.status}`
+          )
+        }
+      >
+        <View style={styles.avatarContainer}>
+          <Image
+            source={{
+              uri:
+                item.avatarUrl && item.avatarUrl.trim() !== ''
+                  ? item.avatarUrl
+                  : 'https://static.vecteezy.com/system/resources/previews/024/183/525/non_2x/avatar-of-a-man-portrait-of-a-young-guy-illustration-of-male-character-in-modern-color-style-vector.jpg',
+            }}
+            style={styles.avatar}
+          />
+          <View
+            style={[
+              styles.onlineIndicator,
+              { backgroundColor: item.status === 'online' ? 'green' : 'gray' },
+            ]}
+          />
+        </View>
         <View
           style={[
-            styles.onlineIndicator,
-            { backgroundColor: item.status === "online" ? 'green' : 'gray' },
+            styles.infoContainer,
+            {
+              marginLeft: isRTL ? 0 : 15,
+              marginRight: isRTL ? 15 : 0,
+              alignItems: isRTL ? 'flex-end' : 'flex-start',
+            },
           ]}
-        />
-      </View>
-      <View
-        style={[
-          styles.infoContainer,
-          {
-            marginLeft: isRTL ? 0 : 15,
-            marginRight: isRTL ? 15 : 0,
-            alignItems: isRTL ? 'flex-end' : 'flex-start',
-          },
-        ]}
+        >
+          <Text style={[styles.friendName, { color: darkMode ? '#fff' : '#000' }]}>
+            {item.username}
+          </Text>
+          <Text style={[styles.statusMessage, { color: darkMode ? '#aaa' : '#666' }]}>
+            {item.status === 'online' ? 'Online' : 'Offline'}
+          </Text>
+        </View>
+      </TouchableOpacity>
+
+      {/* زر الحذف */}
+      <TouchableOpacity
+        onPress={() => handleDelete(item._id, item.username)}
+        style={{ paddingHorizontal: 10 }}
+        disabled={loadingDElet}
       >
-        <Text style={[styles.friendName, { color: darkMode ? '#fff' : '#000' }]}>{item.username}</Text>
-        <Text style={[styles.statusMessage, { color: darkMode ? '#aaa' : '#666' }]}>{item.status === "online" ? "Online" : "Offline"}</Text>
-      </View>
-    </TouchableOpacity>
+        <Ionicons name="trash-outline" size={15} color="red" />
+      </TouchableOpacity>
+    </View>
   );
 
   if (user.loading) {

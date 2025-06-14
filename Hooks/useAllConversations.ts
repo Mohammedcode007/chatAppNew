@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useWebSocket } from "@/context/WebSocketContext";
 
-type ConversationSummary = {
+export type ConversationSummary = {
   withUserId: string;
   withUsername: string;
   withAvatarUrl?: string;
@@ -124,5 +124,6 @@ export function useAllConversations() {
     conversations,
     loading,
     refreshConversations,
+    setConversations
   };
 }

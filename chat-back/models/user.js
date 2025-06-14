@@ -62,6 +62,10 @@ allowDirectGroupJoin: { type: Boolean, default: true },
   customUsernameColor: { type: String, default: 'black' },  // لون اسم المستخدم
 
   badge: { type: String, default: '' },
+hiddenConversations: [{
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  deletedAt: { type: Date, default: Date.now }
+}],
 
   subscription: {
     plan: { type: String, enum: ['free', 'silver', 'gold', 'vip'], default: 'free' },

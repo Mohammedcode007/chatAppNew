@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { Text } from '@/components/Themed';
 import CustomHeader from '@/components/CustomHeader';
@@ -16,9 +17,10 @@ import { useThemeMode } from '@/context/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import i18n from '@/i18n';
 import { useRouter } from 'expo-router';
-import { useAllConversations } from '@/Hooks/useAllConversations';
+import { ConversationSummary, useAllConversations } from '@/Hooks/useAllConversations';
 import { useFocusEffect } from '@react-navigation/native';
 import { useUserFetcherById } from '@/Hooks/useUserFetcherById';
+import { useDeleteConversation } from '@/Hooks/useDeleteConversation';
 
 function formatTime(dateTimeStr: string, locale = 'en-US') {
   const date = new Date(dateTimeStr);
@@ -52,9 +54,9 @@ export default function ChatsScreen() {
   const isRTL = language === 'ar';
   const dynamicStyles = styles(darkMode, isRTL);
 
-  const { conversations, loading, refreshConversations } = useAllConversations();
-  console.log(conversations);
-  
+  const { conversations, loading, refreshConversations, setConversations } = useAllConversations();
+  console.log(conversations, '56564');
+
   useFocusEffect(
     useCallback(() => {
       refreshConversations();
@@ -64,10 +66,8 @@ export default function ChatsScreen() {
     conv.withUsername.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-    const [userData, setUserData] = useState<any>(null);
-  console.log(userData, 'userData');
+  const [userData, setUserData] = useState<any>(null);
   const { userData: userDataNew } = useUserFetcherById(userData?._id);
-  console.log(userDataNew, 'userDataNew');
 
 
   useEffect(() => {
@@ -85,13 +85,15 @@ export default function ChatsScreen() {
 
     fetchUserData();
   }, []);
-useEffect(() => {
-  if (userDataNew && userDataNew._id) {
-    setUserData(userDataNew); // تحديث دائمًا إذا كانت البيانات الجديدة موجودة
-    AsyncStorage.setItem('userData', JSON.stringify(userDataNew)); // حفظ في التخزين المحلي
-  }
-}, [userDataNew]);
-
+  useEffect(() => {
+    if (userDataNew && userDataNew._id) {
+      setUserData(userDataNew); // تحديث دائمًا إذا كانت البيانات الجديدة موجودة
+      AsyncStorage.setItem('userData', JSON.stringify(userDataNew)); // حفظ في التخزين المحلي
+    }
+  }, [userDataNew]);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<ConversationSummary | null>(null);
+  const { deleteConversation } = useDeleteConversation(conversations, setConversations);
 
   if (loading) {
     return (
@@ -148,6 +150,10 @@ useEffect(() => {
                     // `/chat/${item.withUserId}?name=${encodeURIComponent(item.withUsername)}`
                   )
                 }
+                onLongPress={() => {
+                  setSelectedItem(item);
+                  setDeleteModalVisible(true);
+                }}
               >
                 <Image
                   source={{ uri: item.withAvatarUrl && item.withAvatarUrl.trim() !== '' ? item.withAvatarUrl : 'https://static.vecteezy.com/system/resources/previews/024/183/525/non_2x/avatar-of-a-man-portrait-of-a-young-guy-illustration-of-male-character-in-modern-color-style-vector.jpg' }}
@@ -191,6 +197,40 @@ useEffect(() => {
           }}
         />
       )}
+      <Modal
+        visible={deleteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteModalVisible(false)}
+      >
+        <View style={dynamicStyles.modalOverlay}>
+          <View style={dynamicStyles.modalContainer}>
+            <Text style={dynamicStyles.modalTitle}>
+              هل تريد حذف هذه المحادثة؟
+            </Text>
+            <View style={dynamicStyles.modalActions}>
+              <TouchableOpacity
+                style={dynamicStyles.modalButton}
+                onPress={() => {
+                  // هنا من المفترض تنفيذ دالة الحذف
+                  if (selectedItem) {
+                    deleteConversation(selectedItem.withUserId);
+                  }
+                  setDeleteModalVisible(false);
+                }}
+              >
+                <Text style={dynamicStyles.modalButtonText}>حذف</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[dynamicStyles.modalButton, { backgroundColor: '#ccc' }]}
+                onPress={() => setDeleteModalVisible(false)}
+              >
+                <Text style={dynamicStyles.modalButtonText}>إلغاء</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 
@@ -273,6 +313,43 @@ const styles = (darkMode: boolean, isRTL: boolean) =>
     chatTime: {
       fontSize: 12,
       color: darkMode ? '#bbb' : '#999',
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalContainer: {
+      width: '80%',
+      backgroundColor: '#fff',
+      borderRadius: 12,
+      padding: 20,
+      elevation: 5,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: '#333',
+      textAlign: 'center',
+      marginBottom: 15,
+    },
+    modalActions: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    modalButton: {
+      flex: 1,
+      marginHorizontal: 5,
+      paddingVertical: 10,
+      backgroundColor: '#e53935',
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    modalButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '500',
     },
     chatFooter: {
       flexDirection: 'row',
