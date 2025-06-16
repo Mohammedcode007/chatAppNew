@@ -97,43 +97,45 @@ export default function GroupChatScreen() {
 
     }));
     
-setLocalMessages(prev => {
-  const filteredPrev = prev.filter(tempMsg => {
-    if (!tempMsg.isTemporary) return true;
+// setLocalMessages(prev => {
+//   const filteredPrev = prev.filter(tempMsg => {
+//     if (!tempMsg.isTemporary) return true;
 
-    // نحاول نلاقي رسالة حقيقية بنفس الخصائص
-    const hasMatch = realMessages.some(realMsg =>
-      realMsg.text === tempMsg.text &&
-      realMsg.sender._id === tempMsg.sender._id &&
-      realMsg.type === tempMsg.type &&
-      Math.abs(realMsg.timestamp - tempMsg.timestamp) < 10000 // أقل من 10 ثواني فرق
-    );
+//     // نحاول نلاقي رسالة حقيقية بنفس الخصائص
+//     const hasMatch = realMessages.some(realMsg =>
+//       realMsg.text === tempMsg.text &&
+//       realMsg.sender._id === tempMsg.sender._id &&
+//       realMsg.type === tempMsg.type &&
+//       Math.abs(realMsg.timestamp - tempMsg.timestamp) < 10000 // أقل من 10 ثواني فرق
+//     );
 
-    return !hasMatch;
-  });
+//     return !hasMatch;
+//   });
 
-  const combined = [...filteredPrev, ...realMessages];
+//   const combined = [...filteredPrev, ...realMessages];
 
-  // منع التكرار على مستوى _id (الرسائل الحقيقية فقط)
-  const unique = new Map();
-  for (const msg of combined) {
-    unique.set(msg._id, msg);
-  }
+//   // منع التكرار على مستوى _id (الرسائل الحقيقية فقط)
+//   const unique = new Map();
+//   for (const msg of combined) {
+//     unique.set(msg._id, msg);
+//   }
 
-  const result = Array.from(unique.values());
-  result.sort((a, b) => a.timestamp - b.timestamp);
-  return result;
-});
+//   const result = Array.from(unique.values());
+//   result.sort((a, b) => a.timestamp - b.timestamp);
+//   return result;
+// });
 
-    // setLocalMessages(prev => {
-    //   // حذف الرسائل الوهمية التي تم استبدالها
-    //   const realIds = new Set(realMessages.map(m => m._id));
-    //   const filteredPrev = prev.filter(m => m.isTemporary && !realIds.has(m._id.replace('temp-', '')));
 
-    //   const combined = [...filteredPrev, ...realMessages];
-    //   combined.sort((a, b) => a.timestamp - b.timestamp);
-    //   return combined;
-    // });
+
+    setLocalMessages(prev => {
+      // حذف الرسائل الوهمية التي تم استبدالها
+      const realIds = new Set(realMessages.map(m => m._id));
+      const filteredPrev = prev.filter(m => m.isTemporary && !realIds.has(m._id.replace('temp-', '')));
+
+      const combined = [...filteredPrev, ...realMessages];
+      combined.sort((a, b) => a.timestamp - b.timestamp);
+      return combined;
+    });
 
     // تمرير إلى آخر الرسائل
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
