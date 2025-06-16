@@ -55,7 +55,6 @@ export default function ChatsScreen() {
   const dynamicStyles = styles(darkMode, isRTL);
 
   const { conversations, loading, refreshConversations, setConversations } = useAllConversations();
-  console.log(conversations, '56564');
 
   useFocusEffect(
     useCallback(() => {

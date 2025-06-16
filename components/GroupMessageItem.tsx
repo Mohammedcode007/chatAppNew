@@ -51,9 +51,12 @@ interface Props {
 const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 
 const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
+  
 
   const { darkMode } = useThemeMode();
-  const isMyMessage = item?.sender?._id === currentUserId;
+  const isMyMessage = item?.sender?._id === currentUserId || item?.isTemporary;
+
+  // const isMyMessage = item?.sender?._id === currentUserId;
   const avatarUrl = item?.sender?.avatarUrl || DEFAULT_AVATAR;
   const isSystemMessage = item.senderType === 'system';
   const [userData, setUserData] = useState<any>(null);
@@ -85,17 +88,7 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
     }
   }, [isGif, item, selectedEmoji]);
 
-  // useEffect(() => {
-  //   if (isGif) {
-  //     setInternalModalVisible(true);
 
-  //     const timer = setTimeout(() => {
-  //       setInternalModalVisible(false);
-  //     }, duration);
-
-  //     return () => clearTimeout(timer);
-  //   }
-  // }, [isGif]);
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -151,7 +144,6 @@ const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
     setInternalModalVisible(false);
   };
 
-  console.log(item, 'selectedEmoji');
 
 const regex = emojiRegex();
 const match = item.text.match(regex);

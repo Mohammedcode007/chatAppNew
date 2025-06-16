@@ -35,6 +35,8 @@ type Message = {
   sender: {
     _id: string;
     username: string;
+    avatarUrl?: string;
+    badge?: string;
   }
   timestamp: number;
   isTemporary?: boolean;
@@ -94,16 +96,44 @@ export default function GroupChatScreen() {
       senderType: msg.senderType, // ← أضف هذا السطر
 
     }));
+    
+setLocalMessages(prev => {
+  const filteredPrev = prev.filter(tempMsg => {
+    if (!tempMsg.isTemporary) return true;
 
-    setLocalMessages(prev => {
-      // حذف الرسائل الوهمية التي تم استبدالها
-      const realIds = new Set(realMessages.map(m => m._id));
-      const filteredPrev = prev.filter(m => m.isTemporary && !realIds.has(m._id.replace('temp-', '')));
+    // نحاول نلاقي رسالة حقيقية بنفس الخصائص
+    const hasMatch = realMessages.some(realMsg =>
+      realMsg.text === tempMsg.text &&
+      realMsg.sender._id === tempMsg.sender._id &&
+      realMsg.type === tempMsg.type &&
+      Math.abs(realMsg.timestamp - tempMsg.timestamp) < 10000 // أقل من 10 ثواني فرق
+    );
 
-      const combined = [...filteredPrev, ...realMessages];
-      combined.sort((a, b) => a.timestamp - b.timestamp);
-      return combined;
-    });
+    return !hasMatch;
+  });
+
+  const combined = [...filteredPrev, ...realMessages];
+
+  // منع التكرار على مستوى _id (الرسائل الحقيقية فقط)
+  const unique = new Map();
+  for (const msg of combined) {
+    unique.set(msg._id, msg);
+  }
+
+  const result = Array.from(unique.values());
+  result.sort((a, b) => a.timestamp - b.timestamp);
+  return result;
+});
+
+    // setLocalMessages(prev => {
+    //   // حذف الرسائل الوهمية التي تم استبدالها
+    //   const realIds = new Set(realMessages.map(m => m._id));
+    //   const filteredPrev = prev.filter(m => m.isTemporary && !realIds.has(m._id.replace('temp-', '')));
+
+    //   const combined = [...filteredPrev, ...realMessages];
+    //   combined.sort((a, b) => a.timestamp - b.timestamp);
+    //   return combined;
+    // });
 
     // تمرير إلى آخر الرسائل
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
@@ -114,31 +144,41 @@ export default function GroupChatScreen() {
     if (!inputText.trim() || !userData?._id) return;
 
     const tempId = `temp-${Date.now()}`;
-
     const newTempMessage: Message = {
       _id: tempId,
       type: 'text',
       text: inputText.trim(),
-      sender: userData._id,
+      sender: {
+        _id: userData._id,
+        username: userData.username,
+        avatarUrl: userData.avatarUrl,
+        badge: userData.badge,
+      },
       timestamp: Date.now(),
       isTemporary: true,
+      senderType: 'user',
     };
 
-    // عرض الرسالة الوهمية فوراً
-    // setLocalMessages(prev => [...prev, newTempMessage]);
+    // const newTempMessage: Message = {
+    //   _id: tempId,
+    //   type: 'text',
+    //   text: inputText.trim(),
+    //   sender: userData._id,
+    //   timestamp: Date.now(),
+    //   isTemporary: true,
+    // };
+
+    setLocalMessages(prev => [...prev, newTempMessage]);
     setInputText('');
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
     try {
       await sendMessage(inputText.trim(), 'text', senderType);
-      setLocalMessages(prev => prev.filter(m => m._id !== tempId));
+      // setLocalMessages(prev => prev.filter(m => m._id !== tempId));
 
-      // الرسائل الحقيقية ستصل وتحدث localMessages من useEffect أعلاه
     } catch (error) {
-      // حذف الرسالة الوهمية عند فشل الإرسال
       // setLocalMessages(prev => prev.filter(m => m._id !== tempId));
       console.error('Failed to send message:', error);
-      // هنا يمكن إضافة إعلام المستخدم بالفشل
     }
   };
   const displayMessages = [
@@ -316,10 +356,10 @@ export default function GroupChatScreen() {
         keyExtractor={(item) => item._id}
         renderItem={renderMessage}
         contentContainerStyle={styles.messagesList}
-             onContentSizeChange={scrollToEnd}
-          onLayout={scrollToEnd}
-        // onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        // onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        onContentSizeChange={scrollToEnd}
+        onLayout={scrollToEnd}
+      // onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+      // onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
       />
 
 

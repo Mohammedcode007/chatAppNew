@@ -78,7 +78,6 @@ export default function GroupChatsScreen() {
   const [loadingGroup, setLoadingGroup] = useState(false);
 
   const [pendingJoinGroup, setPendingJoinGroup] = useState<any>(null); // تخزين المجموعة المراد الانضمام إليها
-console.log(pendingJoinGroup,"pendingJoinGroup");
 
   const { members, loading: loadingMembers, error: membersError } = useGroupMembers(selectedGroupId);
 
