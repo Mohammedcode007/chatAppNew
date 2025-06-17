@@ -29,6 +29,7 @@ import axios from 'axios';
 import { API_URL } from '@/config';
 
 type Message = {
+  tempId: any;
   _id: string; // معرف حقيقي أو وهمي يبدأ بـ "temp-"
   type: 'text' | 'image' | 'audio';
   text: string;
@@ -43,6 +44,9 @@ type Message = {
   senderType?: 'user' | 'system'; // ← أضف هذا الحقل هنا
 
 };
+
+
+
 
 
 
@@ -82,64 +86,67 @@ export default function GroupChatScreen() {
     })();
   }, []);
 
-  // تحديث localMessages عند استقبال رسائل جديدة من الخادم
-  useEffect(() => {
-    if (!messages) return;
 
-    const realMessages: Message[] = messages.map((msg: any) => ({
-      _id: msg._id,
-      type: msg.messageType,
-      text: msg.text,
-      sender: msg?.sender,
-      timestamp: new Date(msg.timestamp).getTime(),
-      isTemporary: false,
-      senderType: msg.senderType, // ← أضف هذا السطر
+useEffect(() => {
+  if (!messages) return;
 
-    }));
-    
-// setLocalMessages(prev => {
-//   const filteredPrev = prev.filter(tempMsg => {
-//     if (!tempMsg.isTemporary) return true;
+  const realMessages = messages.map((msg) => ({
+    _id: msg._id,
+    type: msg.messageType,
+    text: msg.text,
+    // sender: msg.sender,
+       sender: {
+        _id: userData._id,
+        username: userData.username,
+        avatarUrl: userData.avatarUrl,
+        badge: userData.badge,
+      },
+    timestamp: new Date(msg.timestamp).getTime(),
+    isTemporary: true,
+    tempId: msg.tempId,
+    senderType: msg.senderType,
+  }));
 
-//     // نحاول نلاقي رسالة حقيقية بنفس الخصائص
-//     const hasMatch = realMessages.some(realMsg =>
-//       realMsg.text === tempMsg.text &&
-//       realMsg.sender._id === tempMsg.sender._id &&
-//       realMsg.type === tempMsg.type &&
-//       Math.abs(realMsg.timestamp - tempMsg.timestamp) < 10000 // أقل من 10 ثواني فرق
-//     );
+  console.log('🔵 realMessages from server:', JSON.stringify(realMessages));
 
-//     return !hasMatch;
-//   });
+  setLocalMessages((prev) => {
+    console.log('🟡 previous localMessages:', JSON.stringify(prev));
 
-//   const combined = [...filteredPrev, ...realMessages];
+    const filteredTempMessages = prev.filter(
+      (temp) =>
+        !temp.tempId || // لا يملك tempId أصلاً
+        !realMessages.some((real) => isDuplicate(temp, real)) // لا يوجد نسخة مؤكدة من السيرفر
+    );
 
-//   // منع التكرار على مستوى _id (الرسائل الحقيقية فقط)
-//   const unique = new Map();
-//   for (const msg of combined) {
-//     unique.set(msg._id, msg);
-//   }
+    const combined = [...filteredTempMessages, ...realMessages];
 
-//   const result = Array.from(unique.values());
-//   result.sort((a, b) => a.timestamp - b.timestamp);
-//   return result;
-// });
+    const unique = new Map();
+    for (const msg of combined) {
+      unique.set(msg._id, msg); // المفتاح هنا هو _id فقط، يُفضّل أيضًا فحص tempId
+    }
+
+    const result = Array.from(unique.values()).sort(
+      (a, b) => a.timestamp - b.timestamp
+    );
+
+    console.log('✅ finalMessages after merge:', JSON.stringify(result));
+    return result;
+  });
+
+  setTimeout(() => {
+    flatListRef.current?.scrollToEnd({ animated: true });
+  }, 100);
+}, [messages]);
+
+function isDuplicate(temp: any, real: any): boolean {
+  return (
+    temp.tempId &&
+    real.tempId &&
+    temp.tempId === real.tempId
+  );
+}
 
 
-
-    setLocalMessages(prev => {
-      // حذف الرسائل الوهمية التي تم استبدالها
-      const realIds = new Set(realMessages.map(m => m._id));
-      const filteredPrev = prev.filter(m => m.isTemporary && !realIds.has(m._id.replace('temp-', '')));
-
-      const combined = [...filteredPrev, ...realMessages];
-      combined.sort((a, b) => a.timestamp - b.timestamp);
-      return combined;
-    });
-
-    // تمرير إلى آخر الرسائل
-    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-  }, [messages]);
 
   // إرسال رسالة نصية مع عرض الرسالة الوهمية فوراً
   const sendTextMessage = async () => {
@@ -159,23 +166,18 @@ export default function GroupChatScreen() {
       timestamp: Date.now(),
       isTemporary: true,
       senderType: 'user',
+      tempId: undefined
     };
 
-    // const newTempMessage: Message = {
-    //   _id: tempId,
-    //   type: 'text',
-    //   text: inputText.trim(),
-    //   sender: userData._id,
-    //   timestamp: Date.now(),
-    //   isTemporary: true,
-    // };
+   
 
     setLocalMessages(prev => [...prev, newTempMessage]);
     setInputText('');
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
     try {
-      await sendMessage(inputText.trim(), 'text', senderType);
+
+await sendMessage(inputText.trim(), 'text', senderType);
       // setLocalMessages(prev => prev.filter(m => m._id !== tempId));
 
     } catch (error) {

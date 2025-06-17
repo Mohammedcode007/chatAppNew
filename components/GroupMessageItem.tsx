@@ -52,6 +52,7 @@ const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 
 const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
   
+console.log(item,'454545454');
 
   const { darkMode } = useThemeMode();
   const isMyMessage = item?.sender?._id === currentUserId || item?.isTemporary;
