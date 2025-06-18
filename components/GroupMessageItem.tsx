@@ -24,10 +24,21 @@ import AnimatedGifOverlay from './AnimatedGifOverlay';
 import AudioMessage from './AudioMessage';
 import ImageMessage from './ImageMessage';
 import FloatingEmoji from './FloatingEmoji';
+import { Audio } from 'expo-av';
+
 const isUrl = (text: string) => {
   const urlRegex = /^(https?:\/\/[^\s]+)$/i;
   return urlRegex.test(text.trim());
 };
+const extractMp3Url = (text: string): string | null => {
+  console.log(text, "text");
+
+  const urlRegex = /(https?:\/\/[^\s]+\.mp3(\?[^\s]*)?)/i;
+  const match = text.match(urlRegex);
+  return match ? match[1] : null;
+};
+
+
 export type Message = {
   _id: string;
   type: 'text' | 'image' | 'audio' | 'gif';
@@ -51,11 +62,13 @@ interface Props {
 const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 
 const GroupMessageItem: React.FC<Props> = ({ item, currentUserId }) => {
-  
-console.log(item,'454545454');
+
+  console.log(item, '454545454');
 
   const { darkMode } = useThemeMode();
   const isMyMessage = item?.sender?._id === currentUserId || item?.isTemporary;
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   // const isMyMessage = item?.sender?._id === currentUserId;
   const avatarUrl = item?.sender?.avatarUrl || DEFAULT_AVATAR;
@@ -66,8 +79,46 @@ console.log(item,'454545454');
   const isGif = item.type === 'gif';
 
   const [internalModalVisible, setInternalModalVisible] = useState(false);
+  useEffect(() => {
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+    };
+  }, [sound]);
+
 
   const duration = 16000;
+  const togglePlaySound = async (url: string) => {
+    try {
+      if (sound) {
+        if (isPlaying) {
+          await sound.pauseAsync();
+          setIsPlaying(false);
+        } else {
+          await sound.playAsync();
+          setIsPlaying(true);
+        }
+      } else {
+        const { sound: newSound } = await Audio.Sound.createAsync(
+          { uri: url },
+          { shouldPlay: true }
+        );
+        setSound(newSound);
+        setIsPlaying(true);
+
+        newSound.setOnPlaybackStatusUpdate(status => {
+          if (status.isLoaded && status.didJustFinish) {
+            setIsPlaying(false);
+            setSound(null);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Failed to play sound:', error);
+    }
+  };
+
   useEffect(() => {
     if (isGif) {
       const now = Date.now();
@@ -146,9 +197,9 @@ console.log(item,'454545454');
   };
 
 
-const regex = emojiRegex();
-const match = item.text.match(regex);
-const emoji = match ? match[0] : null;
+  const regex = emojiRegex();
+  const match = item.text.match(regex);
+  const emoji = match ? match[0] : null;
 
   return (
     <View
@@ -195,9 +246,72 @@ const emoji = match ? match[0] : null;
             : { flex: 1 }
         ]}
       >
-        {!isUrl(item.text) && (
+        {/* {!isUrl(item.text) && (
           <Text style={{ color: 'red', fontSize: 10 }}>{item.text}</Text>
-        )}
+        )} */}
+
+      {(() => {
+  const mp3Url = extractMp3Url(item.text);
+
+  // استخراج اسم الأغنية من بداية النص قبل الرابط
+  const songTitle = item.text.split('🔗')[0]?.trim();
+
+  if (mp3Url) {
+    return (
+      <View
+        style={{
+          backgroundColor: '#222',
+          alignSelf: 'center',
+          borderRadius: 14,
+          padding: 10,
+          marginVertical: 4,
+          maxWidth: '85%',
+        }}
+      >
+        <Text
+          style={{
+            color: '#fff',
+            fontSize: 13,
+            marginBottom: 6,
+            textAlign: 'center',
+          }}
+        >
+          🎵 {songTitle}
+        </Text>
+
+        <TouchableOpacity
+          style={{
+            paddingVertical: 6,
+            paddingHorizontal: 12,
+            borderRadius: 8,
+            backgroundColor: isPlaying ? '#dc2626' : '#4b5563',
+            alignSelf: 'center',
+          }}
+          onPress={() => togglePlaySound(mp3Url)}
+        >
+          <Text style={{ color: 'white', fontSize: 14 }}>
+            {isPlaying ? '⏸️ إيقاف' : '▶️ تشغيل الصوت'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  } else {
+    return (
+      <Text
+        style={{
+          color: 'red',
+          fontSize: 10,
+          alignSelf: 'center',
+          marginVertical: 4,
+        }}
+      >
+        {item.text}
+      </Text>
+    );
+  }
+})()}
+
+        
 
 
         {isSystemMessage && isGif && internalModalVisible && (
@@ -222,7 +336,7 @@ const emoji = match ? match[0] : null;
                   soundPath={require('../assets/sound/phoenixsound.mp3')}
                   duration={duration}
                 /> */}
-              {emoji && <FloatingEmoji emoji={emoji} />}
+                {emoji && <FloatingEmoji emoji={emoji} />}
 
 
               </View>
@@ -330,7 +444,7 @@ const emoji = match ? match[0] : null;
         onClose={() => setGiftVisible(false)}
       >
         <Text style={styles.giftTitle}>Select a Gift:</Text>
-        <ScrollView  contentContainerStyle={styles.giftScroll}>
+        <ScrollView contentContainerStyle={styles.giftScroll}>
           {['🥰', '🌹', '🍫', '💎', '🎂',
             '🔥', '✨', '🎁', '😻', '👑',
             '🎈', '🧸', '💖', '😇', '💐',
@@ -460,7 +574,7 @@ const styles = StyleSheet.create({
   giftScroll: {
     paddingHorizontal: 10,
     paddingBottom: 10,
-      flexDirection: 'row',
+    flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
   },
@@ -469,9 +583,9 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 12,
     marginHorizontal: 8,
-        marginVertical: 6,
+    marginVertical: 6,
 
-  
+
   },
   emoji: {
     fontSize: 32,

@@ -1,0 +1,15 @@
+# تجاهل مجلدات غير ضرورية
+node_modules
+.git
+
+# تجاهل الصور الاختبارية أو المؤقتة (عدّل حسب حالتك)
+assets/images/test/
+assets/images/tmp/
+assets/images/uncompressed/
+assets/images/unused/
+
+# ملفات عامة
+*.zip
+*.rar
+*.tar.gz
+.DS_Store

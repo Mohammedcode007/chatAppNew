@@ -362,8 +362,7 @@ await sendMessage(inputText.trim(), 'text', senderType);
         contentContainerStyle={styles.messagesList}
         onContentSizeChange={scrollToEnd}
         onLayout={scrollToEnd}
-      // onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-      // onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+
       />
 
 
@@ -380,11 +379,6 @@ await sendMessage(inputText.trim(), 'text', senderType);
         stopRecording={stopRecording}
         insetsBottom={insets.bottom}
 
-
-      // inputText={inputText}
-      // onChangeText={setInputText}
-      // onSend={sendTextMessage}
-      // darkMode={darkMode}
       />
       {/** الزر العائم */}
       <DraggableFAB onSearchPress={() => console.log('فتح البحث')} messages={localMessages} />
